@@ -1,4 +1,5 @@
 import {XctestAttachmentDeletionClient} from '../../../lib/device/xctest-attachment-deletion-client';
+import {isTunnelAvailabilityError} from '../../../lib/device/remotexpc-utils';
 import chai, {expect} from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import sinon from 'sinon';
@@ -66,5 +67,20 @@ describe('XctestAttachmentDeletionClient', function () {
     const mod = {XCTestAttachment: MockAtt} as any;
     const client = await XctestAttachmentDeletionClient.create('udid', '18.0', mod);
     await expect(client.deleteAttachmentsByUuid(['u'])).to.be.rejectedWith('delete err');
+  });
+
+  it('detects TunnelAvailabilityError by name', function () {
+    const err = new Error('tunnel down');
+    err.name = 'TunnelAvailabilityError';
+    expect(isTunnelAvailabilityError(err)).to.equal(true);
+  });
+
+  it('detects TunnelAvailabilityError by constructor name fallback', function () {
+    const err = {constructor: {name: 'TunnelAvailabilityError'}};
+    expect(isTunnelAvailabilityError(err)).to.equal(true);
+  });
+
+  it('does not misclassify unrelated errors as tunnel availability', function () {
+    expect(isTunnelAvailabilityError(new Error('other'))).to.equal(false);
   });
 });
