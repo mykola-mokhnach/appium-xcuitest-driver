@@ -1,3 +1,9 @@
+## [11.0.2](https://github.com/appium/appium-xcuitest-driver/compare/v11.0.1...v11.0.2) (2026-04-29)
+
+### Bug Fixes
+
+* handle EPIPE for bsdtar ([#2821](https://github.com/appium/appium-xcuitest-driver/issues/2821)) ([63524d4](https://github.com/appium/appium-xcuitest-driver/commit/63524d4deaa8bf53d20212ea89fbd4ec1e6764d7))
+
 ## [11.0.1](https://github.com/appium/appium-xcuitest-driver/compare/v11.0.0...v11.0.1) (2026-04-24)
 
 ### Miscellaneous Chores
