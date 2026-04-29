@@ -1,3 +1,9 @@
+## [11.0.3](https://github.com/appium/appium-xcuitest-driver/compare/v11.0.2...v11.0.3) (2026-04-29)
+
+### Bug Fixes
+
+* Log a warning instead of throwing an error on attachment deletion ([#2822](https://github.com/appium/appium-xcuitest-driver/issues/2822)) ([5a8ffd7](https://github.com/appium/appium-xcuitest-driver/commit/5a8ffd7e1e67432110b14e6efc17699b1f787e53))
+
 ## [11.0.2](https://github.com/appium/appium-xcuitest-driver/compare/v11.0.1...v11.0.2) (2026-04-29)
 
 ### Bug Fixes
