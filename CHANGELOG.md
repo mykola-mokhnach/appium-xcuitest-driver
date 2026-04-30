@@ -1,3 +1,9 @@
+## [11.0.4](https://github.com/appium/appium-xcuitest-driver/compare/v11.0.3...v11.0.4) (2026-04-30)
+
+### Bug Fixes
+
+* Linter warnings ([#2823](https://github.com/appium/appium-xcuitest-driver/issues/2823)) ([208f56b](https://github.com/appium/appium-xcuitest-driver/commit/208f56bb4546d2d276a467c325c9192e0fe409e9))
+
 ## [11.0.3](https://github.com/appium/appium-xcuitest-driver/compare/v11.0.2...v11.0.3) (2026-04-29)
 
 ### Bug Fixes
