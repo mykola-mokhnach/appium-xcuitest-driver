@@ -7,6 +7,11 @@ export const DEFAULT_LOG_LEVEL = 'ALL';
 export const MAX_JSON_LOG_LENGTH = 200;
 export const MAX_BUFFERED_EVENTS_COUNT = 5000;
 
+export interface GrepOptions {
+  caseInsensitive?: boolean;
+}
+
+/** Converts raw log message fields into a WebDriver-style log entry. */
 export function toLogEntry(
   message: string,
   timestamp: number,
@@ -19,10 +24,7 @@ export function toLogEntry(
   };
 }
 
-export interface GrepOptions {
-  caseInsensitive?: boolean;
-}
-
+/** Returns true if the file contains the provided string. */
 export async function grepFile(
   fullPath: string,
   str: string,

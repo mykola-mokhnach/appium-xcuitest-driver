@@ -26,6 +26,7 @@ const XCTEST_LOG_FILES_PATTERNS = [
 const XCTEST_LOGS_CACHE_FOLDER_PREFIX = 'com.apple.dt.XCTest';
 export const NATIVE_WIN = 'NATIVE_APP';
 
+/** Returns installed Xcode version or throws a descriptive error. */
 export async function getAndCheckXcodeVersion(): Promise<XcodeVersion> {
   try {
     return await xcode.getVersion(true);
@@ -34,6 +35,7 @@ export async function getAndCheckXcodeVersion(): Promise<XcodeVersion> {
   }
 }
 
+/** Returns the maximum available iOS SDK version or throws a descriptive error. */
 export async function getAndCheckIosSdkVersion(): Promise<string | null> {
   try {
     return await xcode.getMaxIOSSDK();
@@ -42,6 +44,7 @@ export async function getAndCheckIosSdkVersion(): Promise<string | null> {
   }
 }
 
+/** Deletes the provided filesystem locations, logging reclaimed size when available. */
 export async function clearLogs(locations: string[]): Promise<void> {
   log.debug('Clearing log files');
   const cleanupPromises: Promise<void>[] = [];
@@ -77,6 +80,7 @@ export async function clearLogs(locations: string[]): Promise<void> {
 // folder has been scheduled for removal
 const derivedDataCleanupMarkers = new Map<string, number>();
 
+/** Marks WDA logs folder for deferred cleanup across parallel sessions. */
 export async function markSystemFilesForCleanup(wda: any): Promise<void> {
   if (!wda || !(await wda.retrieveDerivedDataPath())) {
     log.warn(
@@ -94,6 +98,7 @@ export async function markSystemFilesForCleanup(wda: any): Promise<void> {
   derivedDataCleanupMarkers.set(logsRoot, ++markersCount);
 }
 
+/** Cleans per-session WDA logs and stale XCTest temporary logs. */
 export async function clearSystemFiles(wda: any): Promise<void> {
   // only want to clear the system files for the particular WDA xcode run
   if (!wda || !(await wda.retrieveDerivedDataPath())) {
@@ -125,6 +130,7 @@ export async function clearSystemFiles(wda: any): Promise<void> {
     const promises: Promise<void>[] = [];
     for (const dstFolder of dstFolders) {
       const promise = (async () => {
+        const deletionPromises: Promise<void>[] = [];
         try {
           await fs.walkDir(dstFolder, true, (itemPath, isDir) => {
             if (isDir) {
@@ -132,9 +138,12 @@ export async function clearSystemFiles(wda: any): Promise<void> {
             }
             const fileName = path.basename(itemPath);
             if (XCTEST_LOG_FILES_PATTERNS.some((p) => p.test(fileName))) {
-              fs.rimraf(itemPath);
+              deletionPromises.push(fs.rimraf(itemPath));
             }
           });
+          if (deletionPromises.length) {
+            await B.all(deletionPromises);
+          }
         } catch (e: any) {
           log.debug(e.stack);
           log.info(e.message);
@@ -156,6 +165,7 @@ export async function clearSystemFiles(wda: any): Promise<void> {
   log.info(`There is no ${logsRoot} folder, so not cleaning files`);
 }
 
+/** Ensures application path exists before attempting installation. */
 export async function checkAppPresent(app: string): Promise<void> {
   log.debug(`Checking whether app '${app}' is actually present on file system`);
   if (!(await fs.exists(app))) {
@@ -219,6 +229,22 @@ export const getDriverInfo = _.memoize(async function getDriverInfo(): Promise<D
   };
 });
 
+export type UploadOptions = {
+  /** The name of the user for remote authentication (only when `remotePath` is provided). */
+  user?: string;
+  /** The password for remote authentication (only when `remotePath` is provided). */
+  pass?: string;
+  /** Multipart upload HTTP method. Defaults to `PUT`. */
+  method?: Method;
+  /** Additional headers mapping for multipart HTTP(S) uploads. */
+  headers?: HTTPHeaders;
+  /** The form field name that receives the file blob in multipart uploads. */
+  fileFieldName?: string;
+  /** Additional form fields for multipart HTTP(S) uploads. */
+  formFields?: Record<string, any> | [string, any][];
+};
+
+/** Normalizes command timeout capability into a validated milliseconds map. */
 export function normalizeCommandTimeouts(
   value: string | Record<string, number>,
 ): Record<string, number> {
@@ -255,6 +281,7 @@ export function normalizeCommandTimeouts(
   return result;
 }
 
+/** Logs effective OS user running the current process. */
 export async function printUser(): Promise<void> {
   try {
     const {stdout} = await exec('whoami');
@@ -297,28 +324,6 @@ export async function getPIDsListeningOnPort(
     const {stdout} = await exec('ps', ['-p', x, '-o', 'command']);
     return await filteringFunc(stdout);
   });
-}
-
-/**
- * @typedef {Object} UploadOptions
- *
- * @property {string} [user] - The name of the user for the remote authentication. Only works if `remotePath` is provided.
- * @property {string} [pass] - The password for the remote authentication. Only works if `remotePath` is provided.
- * @property {import('axios').Method} [method] - The http multipart upload method name. The 'PUT' one is used by default.
- *                              Only works if `remotePath` is provided.
- * @property {import('@appium/types').HTTPHeaders} [headers] - Additional headers mapping for multipart http(s) uploads
- * @property {string} [fileFieldName] [file] - The name of the form field, where the file content BLOB should be stored for
- *                                            http(s) uploads
- * @property {Record<string, any> | [string, any][]} [formFields] - Additional form fields for multipart http(s) uploads
- */
-
-export interface UploadOptions {
-  user?: string;
-  pass?: string;
-  method?: Method;
-  headers?: HTTPHeaders;
-  fileFieldName?: string;
-  formFields?: Record<string, any> | [string, any][];
 }
 
 /**
@@ -479,6 +484,7 @@ export function normalizePlatformName(platformName: string | null | undefined): 
   return isTvOs(platformName) ? PLATFORM_NAME_TVOS : PLATFORM_NAME_IOS;
 }
 
+/** Whether the initial Safari URL should be pushed at session start. */
 export function shouldSetInitialSafariUrl(opts: XCUITestDriverOpts): boolean {
   return (
     !(opts.safariInitialUrl === '' || (opts.noReset && _.isNil(opts.safariInitialUrl))) &&
@@ -486,18 +492,22 @@ export function shouldSetInitialSafariUrl(opts: XCUITestDriverOpts): boolean {
   );
 }
 
+/** Version-gate helper for iOS 17+ capabilities. */
 export function isIos17OrNewer(opts: XCUITestDriverOpts): boolean {
   return isIos17OrNewerPlatform(opts.platformVersion);
 }
 
+/** Platform-version predicate for iOS 17+. */
 export function isIos17OrNewerPlatform(platformVersion?: string | null): boolean {
   return !!platformVersion && util.compareVersions(platformVersion, '>=', '17.0');
 }
 
+/** Platform-version predicate for iOS 18+. */
 export function isIos18OrNewerPlatform(platformVersion?: string | null): boolean {
   return !!platformVersion && util.compareVersions(platformVersion, '>=', '18.0');
 }
 
+/** Version-gate helper for iOS 18+ capabilities. */
 export function isIos18OrNewer(opts: XCUITestDriverOpts): boolean {
   return isIos18OrNewerPlatform(opts.platformVersion);
 }

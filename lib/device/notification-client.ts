@@ -29,7 +29,26 @@ export class NotificationClient {
     this.remoteXPCConnection = remoteXPCConnection;
   }
 
-  //#region Public Methods
+  /**
+   * Check if this client is using RemoteXPC
+   */
+  private get isRemoteXPC(): boolean {
+    return !!this.remoteXPCConnection;
+  }
+
+  /**
+   * Get service as RemoteXPC NotificationProxyService
+   */
+  private get remoteXPCNotificationProxy(): RemoteXPCNotificationProxyService {
+    return this.service as RemoteXPCNotificationProxyService;
+  }
+
+  /**
+   * Get service as iOS Device NotificationProxy
+   */
+  private get iosDeviceNotificationProxy(): IOSDeviceNotificationProxy {
+    return this.service as IOSDeviceNotificationProxy;
+  }
 
   /**
    * Create a notification client for device
@@ -62,53 +81,6 @@ export class NotificationClient {
     // Fallback to appium-ios-device
     const notificationProxy = await services.startNotificationProxyService(udid);
     return new NotificationClient(notificationProxy, log);
-  }
-
-  /**
-   * Observe a specific notification and wait for it
-   *
-   * @param notificationName - Name of the notification to observe
-   * @returns Promise that resolves when the notification is received
-   */
-  async observeNotification(notificationName: string): Promise<void> {
-    if (this.isRemoteXPC) {
-      await this.remoteXPCNotificationProxy.observe(notificationName);
-    } else {
-      // iOS Device: Use callback-based observation wrapped in a promise
-      return new Promise((resolve) => {
-        this.iosDeviceNotificationProxy.observeNotification(notificationName, {
-          notification: resolve,
-        });
-      });
-    }
-  }
-
-  /**
-   * Close the notification service connection and remoteXPC connection if present
-   */
-  async close(): Promise<void> {
-    // Close the service first
-    this.service.close();
-    // Then close RemoteXPC connection if present
-    if (this.remoteXPCConnection) {
-      try {
-        this.log.debug(`Closing remoteXPC connection`);
-        await this.remoteXPCConnection.close();
-      } catch (err: any) {
-        this.log.debug(`Error closing remoteXPC connection: ${err.message}`);
-      }
-    }
-  }
-
-  //#endregion
-
-  //#region Private Methods
-
-  /**
-   * Check if this client is using RemoteXPC
-   */
-  private get isRemoteXPC(): boolean {
-    return !!this.remoteXPCConnection;
   }
 
   /**
@@ -149,18 +121,38 @@ export class NotificationClient {
   }
 
   /**
-   * Get service as RemoteXPC NotificationProxyService
+   * Observe a specific notification and wait for it
+   *
+   * @param notificationName - Name of the notification to observe
+   * @returns Promise that resolves when the notification is received
    */
-  private get remoteXPCNotificationProxy(): RemoteXPCNotificationProxyService {
-    return this.service as RemoteXPCNotificationProxyService;
+  async observeNotification(notificationName: string): Promise<void> {
+    if (this.isRemoteXPC) {
+      await this.remoteXPCNotificationProxy.observe(notificationName);
+    } else {
+      // iOS Device: Use callback-based observation wrapped in a promise
+      return new Promise((resolve) => {
+        this.iosDeviceNotificationProxy.observeNotification(notificationName, {
+          notification: resolve,
+        });
+      });
+    }
   }
 
   /**
-   * Get service as iOS Device NotificationProxy
+   * Close the notification service connection and remoteXPC connection if present
    */
-  private get iosDeviceNotificationProxy(): IOSDeviceNotificationProxy {
-    return this.service as IOSDeviceNotificationProxy;
+  async close(): Promise<void> {
+    // Close the service first
+    this.service.close();
+    // Then close RemoteXPC connection if present
+    if (this.remoteXPCConnection) {
+      try {
+        this.log.debug(`Closing remoteXPC connection`);
+        await this.remoteXPCConnection.close();
+      } catch (err: any) {
+        this.log.debug(`Error closing remoteXPC connection: ${err.message}`);
+      }
+    }
   }
-
-  //#endregion
 }

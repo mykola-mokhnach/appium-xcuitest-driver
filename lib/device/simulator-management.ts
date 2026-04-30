@@ -10,6 +10,26 @@ import type {DeviceInfo} from 'node-simctl';
 
 const APPIUM_SIM_PREFIX = 'appiumTest';
 
+export interface SimulatorLookupOptions {
+  /** The name of the device to lookup */
+  deviceName?: string;
+  /** The platform version string */
+  platformVersion: string;
+  /** The full path to the simulator devices set */
+  simulatorDevicesSetPath?: string;
+  /** Simulator udid */
+  udid?: string;
+  /** The name of the current platform */
+  platformName?: string;
+}
+
+export interface SimulatorInstallOptions {
+  /** Whether to skip app uninstall before installing it */
+  skipUninstall?: boolean;
+  /** Whether the simulator is brand new */
+  newSimulator?: boolean;
+}
+
 /**
  * Create a new simulator with `appiumTest-` prefix and return the object.
  *
@@ -305,27 +325,3 @@ export async function setLocalizationPrefs(this: XCUITestDriver): Promise<boolea
   await (this.device as Simulator).configureLocalization(l10nConfig);
   return true;
 }
-
-//#region Type Definitions
-
-export interface SimulatorLookupOptions {
-  /** The name of the device to lookup */
-  deviceName?: string;
-  /** The platform version string */
-  platformVersion: string;
-  /** The full path to the simulator devices set */
-  simulatorDevicesSetPath?: string;
-  /** Simulator udid */
-  udid?: string;
-  /** The name of the current platform */
-  platformName?: string;
-}
-
-export interface SimulatorInstallOptions {
-  /** Whether to skip app uninstall before installing it */
-  skipUninstall?: boolean;
-  /** Whether the simulator is brand new */
-  newSimulator?: boolean;
-}
-
-//#endregion

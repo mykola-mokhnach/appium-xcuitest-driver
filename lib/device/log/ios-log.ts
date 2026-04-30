@@ -26,13 +26,11 @@ export abstract class IOSLog<TRawEntry, TSerializedEntry extends object> extends
     this._log = opts.log ?? logger.getLogger(this.constructor.name);
   }
 
-  abstract startCapture(): Promise<void>;
-  abstract stopCapture(): Promise<void>;
-  abstract get isCapturing(): boolean;
-
   get log(): AppiumLogger {
     return this._log;
   }
+
+  abstract get isCapturing(): boolean;
 
   async getLogs(): Promise<LogEntry[]> {
     const result: LogEntry[] = [];
@@ -42,9 +40,6 @@ export abstract class IOSLog<TRawEntry, TSerializedEntry extends object> extends
     this._clearEntries();
     return result;
   }
-
-  protected abstract _serializeEntry(value: TRawEntry): TSerializedEntry;
-  protected abstract _deserializeEntry(value: TSerializedEntry): LogEntry;
 
   protected _clearEntries() {
     this.logs.clear();
@@ -62,6 +57,12 @@ export abstract class IOSLog<TRawEntry, TSerializedEntry extends object> extends
       this.emit('output', this._deserializeEntry(serializedEntry));
     }
   }
+
+  abstract startCapture(): Promise<void>;
+  abstract stopCapture(): Promise<void>;
+
+  protected abstract _serializeEntry(value: TRawEntry): TSerializedEntry;
+  protected abstract _deserializeEntry(value: TSerializedEntry): LogEntry;
 }
 
 export default IOSLog;
