@@ -1,3 +1,9 @@
+## [11.1.0](https://github.com/appium/appium-xcuitest-driver/compare/v11.0.4...v11.1.0) (2026-05-01)
+
+### Features
+
+* Add mobile wrappers for start/stop screen recording ([#2825](https://github.com/appium/appium-xcuitest-driver/issues/2825)) ([2f3fece](https://github.com/appium/appium-xcuitest-driver/commit/2f3fececfbe91c3b54eb032afddb3e95ba05e065))
+
 ## [11.0.4](https://github.com/appium/appium-xcuitest-driver/compare/v11.0.3...v11.0.4) (2026-04-30)
 
 ### Bug Fixes
