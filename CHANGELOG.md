@@ -1,3 +1,9 @@
+## [11.2.0](https://github.com/appium/appium-xcuitest-driver/compare/v11.1.0...v11.2.0) (2026-05-04)
+
+### Features
+
+* Drop bluebird usage ([#2827](https://github.com/appium/appium-xcuitest-driver/issues/2827)) ([2a10f32](https://github.com/appium/appium-xcuitest-driver/commit/2a10f32682ac562a321cd44ca366b4425c9b04f6))
+
 ## [11.1.0](https://github.com/appium/appium-xcuitest-driver/compare/v11.0.4...v11.1.0) (2026-05-01)
 
 ### Features
