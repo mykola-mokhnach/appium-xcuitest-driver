@@ -1,3 +1,9 @@
+## [11.2.3](https://github.com/appium/appium-xcuitest-driver/compare/v11.2.2...v11.2.3) (2026-05-07)
+
+### Miscellaneous Chores
+
+* Bump appium-ios-device ([#2833](https://github.com/appium/appium-xcuitest-driver/issues/2833)) ([b3549bc](https://github.com/appium/appium-xcuitest-driver/commit/b3549bcc5e5e6809b0e7c1f19604c5a2d71693ad))
+
 ## [11.2.2](https://github.com/appium/appium-xcuitest-driver/compare/v11.2.1...v11.2.2) (2026-05-07)
 
 ### Bug Fixes
