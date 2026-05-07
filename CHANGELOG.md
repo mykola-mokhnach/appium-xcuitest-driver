@@ -1,3 +1,13 @@
+## [11.2.2](https://github.com/appium/appium-xcuitest-driver/compare/v11.2.1...v11.2.2) (2026-05-07)
+
+### Bug Fixes
+
+* linter ([#2832](https://github.com/appium/appium-xcuitest-driver/issues/2832)) ([0c88d79](https://github.com/appium/appium-xcuitest-driver/commit/0c88d79db9b835891edc7dc21ef6109dc266a95d))
+
+### Miscellaneous Chores
+
+* Improve logging in RemotexpcPortForwarder ([#2830](https://github.com/appium/appium-xcuitest-driver/issues/2830)) ([c0369db](https://github.com/appium/appium-xcuitest-driver/commit/c0369dbfcc16b18e396e65816fe76344c4ce39f0))
+
 ## [11.2.1](https://github.com/appium/appium-xcuitest-driver/compare/v11.2.0...v11.2.1) (2026-05-04)
 
 ### Miscellaneous Chores
