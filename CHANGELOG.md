@@ -1,3 +1,9 @@
+## [11.2.4](https://github.com/appium/appium-xcuitest-driver/compare/v11.2.3...v11.2.4) (2026-05-08)
+
+### Bug Fixes
+
+* Tunnels cleanup ([#2834](https://github.com/appium/appium-xcuitest-driver/issues/2834)) ([e17218c](https://github.com/appium/appium-xcuitest-driver/commit/e17218c49111c500bef98aeee8d3739aafdfeb24))
+
 ## [11.2.3](https://github.com/appium/appium-xcuitest-driver/compare/v11.2.2...v11.2.3) (2026-05-07)
 
 ### Miscellaneous Chores
