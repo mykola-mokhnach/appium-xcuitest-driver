@@ -41,6 +41,8 @@ class TunnelCreator {
     this._tunnelRegistryPort = 42314;
     /** @type {import('appium-ios-remotexpc').TunnelRegistry | null} */
     this._registry = null;
+    /** @type {import('appium-ios-remotexpc').TunnelRegistryServer | null} */
+    this._registryServer = null;
     /** @type {Map<string, import('appium-ios-remotexpc').UsbmuxDevice>} */
     this._usbDevices = new Map();
     /** @type {Map<string, Promise<void>>} */
@@ -75,6 +77,10 @@ class TunnelCreator {
     return this._registry;
   }
 
+  get registryServer() {
+    return this._registryServer;
+  }
+
   set packetStreamBasePort(port) {
     this._packetStreamBasePort = port;
   }
@@ -95,6 +101,13 @@ class TunnelCreator {
    */
   set registry(value) {
     this._registry = value;
+  }
+
+  /**
+   * @param {import('appium-ios-remotexpc').TunnelRegistryServer | null} value
+   */
+  set registryServer(value) {
+    this._registryServer = value;
   }
 
   /**
@@ -171,12 +184,29 @@ class TunnelCreator {
   async cleanup() {
     this._isCleaningUp = true;
     log.warn('Cleaning up tunnel resources...');
+    /** @type {Error[]} */
+    const cleanupErrors = [];
+    const recordCleanupError = (message, err) => {
+      const wrapped = err instanceof Error ? err : new Error(String(err));
+      cleanupErrors.push(new Error(message, {cause: wrapped}));
+      log.warn(`${message}: ${wrapped.message}`);
+    };
+
     while (this._registryWatcherStops.length > 0) {
       const stop = this._registryWatcherStops.pop();
       try {
         await stop?.();
       } catch (err) {
-        log.warn(`Failed to stop tunnel registry watcher: ${err}`);
+        recordCleanupError('Failed to stop tunnel registry watcher', err);
+      }
+    }
+    if (this._registryServer) {
+      try {
+        await this._registryServer.stop();
+      } catch (err) {
+        recordCleanupError('Failed to stop tunnel registry server', err);
+      } finally {
+        this._registryServer = null;
       }
     }
 
@@ -194,7 +224,7 @@ class TunnelCreator {
             await server.stop();
             log.info(`Closed packet stream server for device ${udid}`);
           } catch (err) {
-            log.warn(`Failed to close packet stream server for device ${udid}: ${err}`);
+            recordCleanupError(`Failed to close packet stream server for device ${udid}`, err);
           }
         }),
       );
@@ -216,9 +246,18 @@ class TunnelCreator {
     })();
 
     await Promise.allSettled([closeUsbPacketStreamServers, closeAppleTVTunnels]);
+    try {
+      await TunnelManager.closeAllTunnels();
+    } catch (err) {
+      recordCleanupError('Failed to close managed tunnel(s)', err);
+    }
     await Promise.allSettled([...this._reconnectTasks.values()]);
 
-    log.info('Cleanup completed.');
+    if (cleanupErrors.length > 0) {
+      throw new AggregateError(cleanupErrors, 'Tunnel cleanup encountered errors');
+    } else {
+      log.info('Cleanup completed.');
+    }
   }
 
   /**
@@ -914,6 +953,9 @@ function setupCleanupHandlers(tunnelCreator) {
       await tunnelCreator.cleanup();
     } catch (err) {
       log.warn(`Error during tunnel cleanup: ${err?.message ?? err}`);
+      if (!process.exitCode) {
+        process.exitCode = 1;
+      }
     }
   };
 
@@ -923,7 +965,8 @@ function setupCleanupHandlers(tunnelCreator) {
       if (process.exitCode == null) {
         // Follow conventional POSIX exit codes for signals where possible.
         if (signal === 'SIGINT') {
-          process.exitCode = 130;
+          // SIGINT is typically sent by Ctrl+C, so we exit with code 0 to indicate success.
+          process.exitCode = 0;
         } else if (signal === 'SIGTERM') {
           process.exitCode = 143;
         } else {
@@ -1093,7 +1136,10 @@ async function main() {
       return;
     }
 
-    await startTunnelRegistryServer(registry, tunnelCreator.tunnelRegistryPort);
+    tunnelCreator.registryServer = await startTunnelRegistryServer(
+      registry,
+      tunnelCreator.tunnelRegistryPort,
+    );
     tunnelCreator._attachTunnelRegistryLifecycleWatch(watchTunnelRegistrySockets, usbResults, {
       onTunnelDead: async ({udid}) => {
         tunnelCreator._reconnectTunnelByUdid(udid);
