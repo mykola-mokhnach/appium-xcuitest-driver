@@ -1,3 +1,9 @@
+## [11.3.0](https://github.com/appium/appium-xcuitest-driver/compare/v11.2.4...v11.3.0) (2026-05-09)
+
+### Features
+
+* add download-wda command ([#2835](https://github.com/appium/appium-xcuitest-driver/issues/2835)) ([1f568b4](https://github.com/appium/appium-xcuitest-driver/commit/1f568b4823a75ede182afdc7c82b73193f554765))
+
 ## [11.2.4](https://github.com/appium/appium-xcuitest-driver/compare/v11.2.3...v11.2.4) (2026-05-08)
 
 ### Bug Fixes
