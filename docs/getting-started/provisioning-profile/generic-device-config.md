@@ -46,7 +46,7 @@ For example, if you're preparing such a provisioning profile for `io.appium.WebD
 In case of a free account or paid account without `*` provisioning profile,
 you may need to update the bundle id before building so `xcodebuild` can produce
 a properly signed WebDriverAgent package. Another option is to re-sign an existing
-package and remap its bundle ids with 3rd party tools such as [resigner](https://github.com/KazuCocoa/resigner).
+package and remap its bundle ids with 3rd party tools such as [resigner](https://github.com/appium/resigner).
 The tool can remap the bundle ids to values allowed by the free provisioning profile and
 then sign the package with that profile.
 
@@ -54,13 +54,22 @@ Please check the tool's readme for details, but in short, you can use the follow
 re-sign the package with bundle id remapping:
 
 ```
-resigner \
+P12_PASSWORD="<password of p12>" resigner \
   --p12-file "<path to p12 file>" \
-  --p12-password "<password of p12>" \
   --profile "<path to provisioning profiles>" \
   --force \
   --bundle-id-remap "com.facebook.WebDriverAgentRunner=<valid bundle id for the profile>" \
   --bundle-id-remap "com.facebook.WebDriverAgentRunner.xctrunner=<valid bundle id for the profile>" \
   --bundle-id-remap "com.facebook.WebDriverAgentLib=<valid bundle id for the profile>" \
   /path/to/WebDriverAgentRunner-Runner.app
+```
+
+Or
+
+```
+P12_PASSWORD="<password of p12>" appium driver run xcuitest sign-wda -- \
+  --wda-path=<path> \
+  --p12-file=<path> \
+  --profile-dir=<path to provisioning profiles> \
+  --bundle-id=<valid bundle id for the profile>
 ```
