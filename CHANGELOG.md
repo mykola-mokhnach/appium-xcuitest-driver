@@ -1,3 +1,9 @@
+## [11.4.0](https://github.com/appium/appium-xcuitest-driver/compare/v11.3.1...v11.4.0) (2026-05-13)
+
+### Features
+
+* add resign task ([#2836](https://github.com/appium/appium-xcuitest-driver/issues/2836)) ([7dfca62](https://github.com/appium/appium-xcuitest-driver/commit/7dfca6298a0dd17b016d71793e465425bb04e59a))
+
 ## [11.3.1](https://github.com/appium/appium-xcuitest-driver/compare/v11.3.0...v11.3.1) (2026-05-12)
 
 ### Miscellaneous Chores
