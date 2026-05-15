@@ -1,3 +1,9 @@
+## [11.4.2](https://github.com/appium/appium-xcuitest-driver/compare/v11.4.1...v11.4.2) (2026-05-15)
+
+### Miscellaneous Chores
+
+* Refactor wda signer code ([#2839](https://github.com/appium/appium-xcuitest-driver/issues/2839)) ([3aafb36](https://github.com/appium/appium-xcuitest-driver/commit/3aafb3600a103a129d4b9dd4452e4c9c4e1223b1))
+
 ## [11.4.1](https://github.com/appium/appium-xcuitest-driver/compare/v11.4.0...v11.4.1) (2026-05-15)
 
 ### Bug Fixes
