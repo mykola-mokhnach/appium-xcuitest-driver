@@ -1,3 +1,9 @@
+## [11.4.1](https://github.com/appium/appium-xcuitest-driver/compare/v11.4.0...v11.4.1) (2026-05-15)
+
+### Bug Fixes
+
+* prevent ECONNRESET by removing redundant RSD connections in AfcClient ([#2840](https://github.com/appium/appium-xcuitest-driver/issues/2840)) ([9ce708b](https://github.com/appium/appium-xcuitest-driver/commit/9ce708b768d1a2d88fec930ac01755637590e7a2))
+
 ## [11.4.0](https://github.com/appium/appium-xcuitest-driver/compare/v11.3.1...v11.4.0) (2026-05-13)
 
 ### Features
