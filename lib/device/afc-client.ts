@@ -49,21 +49,21 @@ interface WalkDirPullWalkContext {
  */
 export class AfcClient {
   private readonly service: RemoteXPCAfcService | IOSDeviceAfcService;
-  private readonly remoteXPCConnection?: RemoteXpcConnection;
+  private readonly _isRemoteXPC: boolean;
 
   private constructor(
     service: RemoteXPCAfcService | IOSDeviceAfcService,
-    remoteXPCConnection?: RemoteXpcConnection,
+    isRemoteXPC: boolean = false,
   ) {
     this.service = service;
-    this.remoteXPCConnection = remoteXPCConnection;
+    this._isRemoteXPC = isRemoteXPC;
   }
 
   /**
    * Check if this client is using RemoteXPC
    */
   private get isRemoteXPC(): boolean {
-    return !!this.remoteXPCConnection;
+    return this._isRemoteXPC;
   }
 
   /**
@@ -89,17 +89,21 @@ export class AfcClient {
    */
   static async createForDevice(udid: string, useRemoteXPC: boolean): Promise<AfcClient> {
     if (useRemoteXPC) {
-      const client = await AfcClient.withRemoteXpcConnection(async () => {
+      // Best-practice pattern (matches go-ios `defer rsd.Close()` and
+      // pymobiledevice3 single-RSD-per-session): perform exactly one RSD
+      // probe via `startAfcService`, which discovers the AFC port, closes
+      // its discovery RSD eagerly, and returns a self-contained AfcService
+      // bound to its own per-service TCP socket. Opening an extra RSD here
+      // would only race with the one inside `startAfcService` and trigger
+      // an ECONNRESET from the on-device `remoted` daemon.
+      try {
         const Services = await getRemoteXPCServices();
-        const connectionResult = await Services.createRemoteXPCConnection(udid);
         const afcService = await Services.startAfcService(udid);
-        return {
-          service: afcService,
-          connection: connectionResult.remoteXPC,
-        };
-      });
-      if (client) {
-        return client;
+        return new AfcClient(afcService, true);
+      } catch (err: any) {
+        log.error(
+          `Failed to create AFC client via RemoteXPC: ${err.message}, falling back to appium-ios-device`,
+        );
       }
     }
 
@@ -126,23 +130,33 @@ export class AfcClient {
     const isDocuments = !skipDocumentsCheck && containerType?.toLowerCase() === 'documents';
 
     if (useRemoteXPC) {
-      const client = await AfcClient.withRemoteXpcConnection(async () => {
+      // Best-practice pattern (matches go-ios `defer rsd.Close()`): one RSD
+      // probe via `startHouseArrestService`, vend the AFC service, then
+      // release the discovery RSD eagerly. The vended AfcService has its
+      // own dedicated socket so it does not need the discovery RSD to
+      // remain open. Avoids the prior pattern of overlapping RSD probes
+      // that triggered ECONNRESETs from the on-device `remoted` daemon.
+      let houseArrestRemoteXPC: RemoteXpcConnection | undefined;
+      try {
         const Services = await getRemoteXPCServices();
-        const connectionResult = await Services.createRemoteXPCConnection(udid);
-        const {houseArrestService, remoteXPC: houseArrestRemoteXPC} =
-          await Services.startHouseArrestService(udid);
+        const result = await Services.startHouseArrestService(udid);
+        houseArrestRemoteXPC = result.remoteXPC;
         const afcService = isDocuments
-          ? await houseArrestService.vendDocuments(bundleId)
-          : await houseArrestService.vendContainer(bundleId);
-        // Use the remoteXPC from house arrest service if available, otherwise use the one from connection
-        const connection = houseArrestRemoteXPC ?? connectionResult.remoteXPC;
-        return {
-          service: afcService,
-          connection,
-        };
-      });
-      if (client) {
-        return client;
+          ? await result.houseArrestService.vendDocuments(bundleId)
+          : await result.houseArrestService.vendContainer(bundleId);
+        return new AfcClient(afcService, true);
+      } catch (err: any) {
+        log.error(
+          `Failed to create AFC client via RemoteXPC: ${err.message}, falling back to appium-ios-device`,
+        );
+      } finally {
+        if (houseArrestRemoteXPC) {
+          try {
+            await houseArrestRemoteXPC.close();
+          } catch {
+            // ignore cleanup errors
+          }
+        }
       }
     }
 
@@ -151,39 +165,6 @@ export class AfcClient {
       ? await houseArrestService.vendDocuments(bundleId)
       : await houseArrestService.vendContainer(bundleId);
     return new AfcClient(afcService);
-  }
-
-  /**
-   * Helper to safely execute remoteXPC operations with connection cleanup
-   * @param operation - Async operation that returns an AfcClient
-   * @returns AfcClient on success, null on failure
-   */
-  private static async withRemoteXpcConnection<T extends RemoteXPCAfcService | IOSDeviceAfcService>(
-    operation: () => Promise<{service: T; connection: RemoteXpcConnection}>,
-  ): Promise<AfcClient | null> {
-    let remoteXPCConnection: RemoteXpcConnection | undefined;
-    let succeeded = false;
-    try {
-      const {service, connection} = await operation();
-      remoteXPCConnection = connection;
-      const client = new AfcClient(service, remoteXPCConnection);
-      succeeded = true;
-      return client;
-    } catch (err: any) {
-      log.error(
-        `Failed to create AFC client via RemoteXPC: ${err.message}, falling back to appium-ios-device`,
-      );
-      return null;
-    } finally {
-      // Only close connection if we failed (if succeeded, the client owns it)
-      if (remoteXPCConnection && !succeeded) {
-        try {
-          await remoteXPCConnection.close();
-        } catch {
-          // Ignore cleanup errors
-        }
-      }
-    }
   }
 
   /**
@@ -316,15 +297,10 @@ export class AfcClient {
   }
 
   /**
-   * Close the AFC service connection and remoteXPC connection if present
+   * Close the AFC service connection
    */
   async close(): Promise<void> {
     this.service.close();
-    if (this.remoteXPCConnection) {
-      try {
-        await this.remoteXPCConnection.close();
-      } catch {}
-    }
   }
 
   /**
