@@ -1,4 +1,4 @@
-import {BatteryInfoClient} from '../device/battery-info-client';
+import {BatteryInfoClient, type AdvancedBatteryInfo} from '../device/battery-info-client';
 import {isIos18OrNewer} from '../utils';
 import type {XCUITestDriver} from '../driver';
 import type {BatteryInfo} from './types';
@@ -12,8 +12,8 @@ import type {BatteryInfo} from './types';
  */
 export async function mobileGetBatteryInfo(
   this: XCUITestDriver,
-): Promise<BatteryInfo & {advanced: Record<string, any>}> {
-  let batteryInfoFromShimService: Record<string, any> = {};
+): Promise<BatteryInfo & {advanced: AdvancedBatteryInfo}> {
+  let batteryInfoFromShimService: AdvancedBatteryInfo = {};
   if (isIos18OrNewer(this.opts) && this.isRealDevice()) {
     try {
       batteryInfoFromShimService = await new BatteryInfoClient(this.device.udid).getAdvancedInfo();
