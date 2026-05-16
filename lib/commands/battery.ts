@@ -1,7 +1,7 @@
+import {BatteryInfoClient} from '../device/battery-info-client';
 import {isIos18OrNewer} from '../utils';
 import type {XCUITestDriver} from '../driver';
 import type {BatteryInfo} from './types';
-import {getRemoteXPCServices} from '../device/remotexpc-utils';
 
 /**
  * Reads the battery information from the device under test.
@@ -13,15 +13,10 @@ import {getRemoteXPCServices} from '../device/remotexpc-utils';
 export async function mobileGetBatteryInfo(
   this: XCUITestDriver,
 ): Promise<BatteryInfo & {advanced: Record<string, any>}> {
-  let batteryInfoFromShimService: Record<string, any> | undefined;
+  let batteryInfoFromShimService: Record<string, any> = {};
   if (isIos18OrNewer(this.opts) && this.isRealDevice()) {
     try {
-      const Services = await getRemoteXPCServices();
-      const diagnosticsService = await Services.startDiagnosticsService(this.device.udid);
-      batteryInfoFromShimService = await diagnosticsService.ioregistry({
-        ioClass: 'IOPMPowerSource',
-        returnRawJson: true,
-      });
+      batteryInfoFromShimService = await new BatteryInfoClient(this.device.udid).getAdvancedInfo();
     } catch (err: any) {
       this.log.error(`Failed to get battery info from DiagnosticsService: ${err.message}`);
     }
@@ -30,6 +25,6 @@ export async function mobileGetBatteryInfo(
   const batteryInfoFromWda = await this.proxyCommand<any, BatteryInfo>('/wda/batteryInfo', 'GET');
   return {
     ...batteryInfoFromWda,
-    advanced: batteryInfoFromShimService || {},
+    advanced: batteryInfoFromShimService,
   };
 }
