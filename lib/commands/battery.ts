@@ -15,24 +15,15 @@ export async function mobileGetBatteryInfo(
 ): Promise<BatteryInfo & {advanced: Record<string, any>}> {
   let batteryInfoFromShimService: Record<string, any> | undefined;
   if (isIos18OrNewer(this.opts) && this.isRealDevice()) {
-    let remoteXPCConnection;
     try {
       const Services = await getRemoteXPCServices();
-      const {diagnosticsService, remoteXPC} = await Services.startDiagnosticsService(
-        this.device.udid,
-      );
-      remoteXPCConnection = remoteXPC;
+      const diagnosticsService = await Services.startDiagnosticsService(this.device.udid);
       batteryInfoFromShimService = await diagnosticsService.ioregistry({
         ioClass: 'IOPMPowerSource',
         returnRawJson: true,
       });
     } catch (err: any) {
       this.log.error(`Failed to get battery info from DiagnosticsService: ${err.message}`);
-    } finally {
-      if (remoteXPCConnection) {
-        this.log.info(`Closing remoteXPC connection for device ${this.device.udid}`);
-        await remoteXPCConnection.close();
-      }
     }
   }
 
