@@ -1,17 +1,15 @@
 import type {AppiumLogger} from '@appium/types';
 import {utilities} from 'appium-ios-device';
-import {
-  createLockdownServiceByUDID,
-  createLockdownServiceForTunnel,
-  type LockdownService,
-} from 'appium-ios-remotexpc';
+import type {LockdownService} from 'appium-ios-remotexpc';
 import type {LockdownInfo} from '../commands/types';
 import type {XCUITestDriverOpts} from '../driver';
 import {log as defaultLogger} from '../logger';
 import {isIos18OrNewer} from '../utils';
 import {
   getLastRemoteXPCOptionalImportError,
+  tryGetRemoteXPCModule,
   tryGetRemoteXPCUsbMuxStrategy,
+  type RemoteXPCEsmModule,
 } from './remotexpc-utils';
 
 /**
@@ -156,6 +154,14 @@ export class LockdownClient {
    * Legacy ios-device can provide inconsistent offset payloads. Normalize to a final offset in
    * minutes for consumers.
    */
+  private async requireRemotexpcModule(): Promise<RemoteXPCEsmModule> {
+    const remotexpc = await tryGetRemoteXPCModule();
+    if (!remotexpc) {
+      throw new Error(`appium-ios-remotexpc module is not initialized for '${this.udid}'.`);
+    }
+    return remotexpc;
+  }
+
   private normalizeUtcOffsetMinutes(utcOffset: number, timeZone: string | number): number {
     // Normal/expected: offset already in minutes.
     if (Math.abs(utcOffset) <= 12 * 60) {
@@ -177,7 +183,8 @@ export class LockdownClient {
     fn: (lockdown: LockdownService) => Promise<T | undefined>,
   ): Promise<T | undefined> {
     try {
-      const {lockdownService} = await createLockdownServiceByUDID(this.udid);
+      const remotexpc = await this.requireRemotexpcModule();
+      const {lockdownService} = await remotexpc.createLockdownServiceByUDID(this.udid);
       try {
         return await fn(lockdownService);
       } finally {
@@ -229,7 +236,8 @@ export class LockdownClient {
     fn: (lockdown: LockdownService) => Promise<T | undefined>,
   ): Promise<T | undefined> {
     try {
-      const lockdown = await createLockdownServiceForTunnel(this.udid);
+      const remotexpc = await this.requireRemotexpcModule();
+      const lockdown = await remotexpc.createLockdownServiceForTunnel(this.udid);
       try {
         return await fn(lockdown);
       } finally {
