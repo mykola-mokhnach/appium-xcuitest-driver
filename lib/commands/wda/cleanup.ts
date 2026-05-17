@@ -61,6 +61,7 @@ export async function clearSystemFiles(
   }
   derivedDataCleanupMarkers.set(logsRoot, 0);
 
+  // Cleaning up big temporary files created by XCTest: https://github.com/appium/appium/issues/9410
   const globPattern = `${os.tmpdir()}/${XCTEST_LOGS_CACHE_FOLDER_PREFIX}*/`;
   const dstFolders = await fs.glob(globPattern);
   if (_.isEmpty(dstFolders)) {
