@@ -947,7 +947,13 @@ export class XCUITestDriver
       }
     }
 
-    await this.logs.syslog?.stopCapture();
+    await Promise.all(
+      _.values(this.logs).map(async (logObj: any) => {
+        if (logObj?.stopCapture) {
+          await logObj.stopCapture();
+        }
+      }),
+    );
     _.values(this.logs).forEach((x: any) => x?.removeAllListeners?.());
     if (this._bidiServerLogListener) {
       this.log.unwrap().off('log', this._bidiServerLogListener);

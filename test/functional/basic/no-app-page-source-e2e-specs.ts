@@ -14,7 +14,7 @@ function getRealDeviceCaps() {
     'appium:automationName': 'XCUITest',
     'appium:noReset': true,
     'appium:showXcodeLog': true,
-    'platformName': 'iOS',
+    platformName: 'iOS',
   };
 }
 

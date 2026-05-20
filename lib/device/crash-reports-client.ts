@@ -50,13 +50,11 @@ export class CrashReportsClient {
    * @returns Basenames of crash report files on the device (e.g. `MyApp-2024-01-01-120000.ips`)
    */
   async listCrashes(): Promise<string[]> {
-    const allFiles = await this.crashReportsService.ls('/', -1);
-    return allFiles
-      .filter((filePath) => CRASH_REPORT_EXTENSIONS.some((ext) => filePath.endsWith(ext)))
-      .map((filePath) => {
-        const parts = filePath.split('/');
-        return parts[parts.length - 1];
-      });
+    const allFiles = await this.crashReportsService.listCrashReportFiles();
+    return allFiles.map((filePath) => {
+      const parts = filePath.split('/');
+      return parts[parts.length - 1];
+    });
   }
 
   /**
@@ -67,7 +65,7 @@ export class CrashReportsClient {
    * @throws {Error} If the named report is not found on the device
    */
   async exportCrash(name: string, dstFolder: string): Promise<void> {
-    const allFiles = await this.crashReportsService.ls('/', -1);
+    const allFiles = await this.crashReportsService.listCrashReportFiles();
     const fullPath = allFiles.find((p) => p.endsWith(`/${name}`) || p === `/${name}`);
 
     if (!fullPath) {
