@@ -226,4 +226,18 @@ describe('RealDevice install routing (zip_conduit fast path)', function () {
     expect(createStub.called).to.be.false;
     expect(afcStub.calledOnce).to.be.true;
   });
+
+  it('skips zip_conduit when useZipConduitInstall is false', async function () {
+    const realDevice = new RealDevice(udid, {
+      platformVersion: '18.0',
+      useZipConduitInstall: false,
+    } as XCUITestDriverOpts);
+    stubStat(true);
+    const createStub = sandbox.stub(ZipConduitClient, 'create') as SinonStub;
+    const afcStub = stubAfcSentinel();
+
+    await expect(realDevice.install(ipaPath, bundleId)).to.be.rejectedWith(/afc-sentinel/);
+    expect(createStub.called).to.be.false;
+    expect(afcStub.calledOnce).to.be.true;
+  });
 });

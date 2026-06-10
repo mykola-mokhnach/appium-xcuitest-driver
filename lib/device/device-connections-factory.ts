@@ -556,13 +556,13 @@ export class DeviceConnectionsFactory {
         `Cannot create port forwarder via RemoteXPC tunnel for '${udid}'`,
       );
     }
-    const tunnelHost = tunnelConnection.host;
     this.log.debug(
-      `Using appium-ios-remotexpc tunnel strategy for '${udid}' through '${tunnelHost}'`,
+      `Using appium-ios-remotexpc tunnel strategy for '${udid}' through '${tunnelConnection.host}'`,
     );
     return new RemotexpcPortForwarder(
       new remotexpc.DevicePortForwarder(localPort, devicePort, {
-        primaryConnector: () => remotexpc.connectViaTunnel(tunnelHost, devicePort),
+        primaryConnector: () =>
+          remotexpc.connectViaTunnelForDevice(udid, devicePort),
       }),
       this.log,
       localPort,

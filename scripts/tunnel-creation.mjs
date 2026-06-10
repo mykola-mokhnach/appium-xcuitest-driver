@@ -13,6 +13,7 @@ import {
   TunnelManager,
   createLockdownServiceByUDID,
   createUsbmux,
+  isTunnelRsdReachable,
   startCoreDeviceProxy,
   startTunnelRegistryServer,
   TUNNEL_CONTAINER_NAME,
@@ -58,6 +59,18 @@ class TunnelCreator {
     this._disconnectRetryIntervalMs = 1000;
     /** @type {import('tls').ConnectionOptions | null} */
     this._tlsOptions = null;
+    /** When false, skip PacketStreamServer so tunnel traffic avoids L4 tap overhead (default). */
+    this._enablePacketStream = false;
+    /** @type {NodeJS.Timeout | undefined} */
+    this._rsdHealthTimer = undefined;
+  }
+
+  get enablePacketStream() {
+    return this._enablePacketStream;
+  }
+
+  set enablePacketStream(value) {
+    this._enablePacketStream = Boolean(value);
   }
 
   get packetStreamBasePort() {
@@ -93,6 +106,32 @@ class TunnelCreator {
    */
   set tlsOptions(value) {
     this._tlsOptions = value;
+  }
+
+  /**
+   * Optionally attach PacketStreamServer for syslog / packet capture consumers.
+   * @param {{ addPacketConsumer?: (consumer: unknown) => void }} tunnel
+   * @param {string} udid
+   * @returns {Promise<{packetStreamPort?: number, packetStreamServer: import('appium-ios-remotexpc').PacketStreamServer | null}>}
+   */
+  async _attachPacketStream(tunnel, udid) {
+    if (!this._enablePacketStream) {
+      return {packetStreamPort: undefined, packetStreamServer: null};
+    }
+
+    const packetStreamPort = this._packetStreamBasePort++;
+    const packetStreamServer = new PacketStreamServer(packetStreamPort);
+    await packetStreamServer.start();
+
+    const consumer = packetStreamServer.getPacketConsumer();
+    if (consumer && typeof tunnel.addPacketConsumer === 'function') {
+      tunnel.addPacketConsumer(consumer);
+    }
+
+    this._packetStreamServers.set(udid, packetStreamServer);
+    log.info(`Packet stream server started on port ${packetStreamPort}`);
+
+    return {packetStreamPort, packetStreamServer};
   }
 
   /**
@@ -182,6 +221,10 @@ class TunnelCreator {
    */
   async cleanup() {
     this._isCleaningUp = true;
+    if (this._rsdHealthTimer) {
+      clearInterval(this._rsdHealthTimer);
+      this._rsdHealthTimer = undefined;
+    }
     log.warn('Cleaning up tunnel resources...');
     /** @type {Error[]} */
     const cleanupErrors = [];
@@ -291,19 +334,7 @@ class TunnelCreator {
     const tunnel = await TunnelManager.getTunnel(socket);
     log.info(`Tunnel created for address: ${tunnel.Address} with RsdPort: ${tunnel.RsdPort}`);
 
-    let packetStreamPort;
-    packetStreamPort = this._packetStreamBasePort++;
-    const packetStreamServer = new PacketStreamServer(packetStreamPort);
-    await packetStreamServer.start();
-
-    const consumer = packetStreamServer.getPacketConsumer();
-    if (consumer) {
-      tunnel.addPacketConsumer(consumer);
-    }
-
-    this._packetStreamServers.set(udid, packetStreamServer);
-
-    log.info(`Packet stream server started on port ${packetStreamPort}`);
+    const {packetStreamPort} = await this._attachPacketStream(tunnel, udid);
 
     log.info(`✅ Tunnel creation completed successfully for device: ${udid}`);
     log.info(`   Tunnel Address: ${tunnel.Address}`);
@@ -445,15 +476,9 @@ class TunnelCreator {
           log.info(`Creating tunnel for Apple TV: ${deviceInfo.identifier}`);
           tunnel = await TunnelManager.getTunnel(tlsSocket);
 
-          const packetStreamPort = this._packetStreamBasePort++;
-          packetStreamServer = new PacketStreamServer(packetStreamPort);
-          await packetStreamServer.start();
-
-          const consumer = packetStreamServer.getPacketConsumer();
-          if (consumer && tunnel?.addPacketConsumer) {
-            tunnel.addPacketConsumer(consumer);
-          }
-          log.info(`Apple TV packet stream server started on port ${packetStreamPort}`);
+          const packetStreamAttach = await this._attachPacketStream(tunnel, deviceInfo.identifier);
+          packetStreamServer = packetStreamAttach.packetStreamServer;
+          const packetStreamPort = packetStreamAttach.packetStreamPort;
 
           this._appletvResources.push({
             tunnel,
@@ -695,6 +720,96 @@ class TunnelCreator {
   }
 
   /**
+   * Recreate a USB tunnel when the registry still lists it but RSD TCP is dead.
+   * Does not require --disconnect-retry-max-attempts (unlike {@link _reconnectTunnelByUdid}).
+   *
+   * @param {string} udid
+   */
+  _forceRecreateUsbTunnel(udid) {
+    if (this._isCleaningUp || this._reconnectTasks.has(udid)) {
+      return;
+    }
+    const device = this._usbDevices.get(udid);
+    const tlsOptions = this._tlsOptions;
+    const watchFn = this._watchTunnelRegistrySocketsFn;
+    if (!device || !tlsOptions || !watchFn) {
+      return;
+    }
+
+    const task = (async () => {
+      try {
+        log.warn(`Recreating USB tunnel for ${udid} after failed RSD health check...`);
+        const result = await this.createTunnelForDevice(device, tlsOptions);
+        this._upsertUsbTunnelInRegistry(result);
+        this._attachTunnelRegistryLifecycleWatch(watchFn, [result], {
+          onTunnelDead: async ({udid: droppedUdid}) => {
+            this._reconnectTunnelByUdid(droppedUdid);
+          },
+        });
+        log.info(
+          `Recreated USB tunnel for ${udid} at ${result.tunnel?.Address}:${result.tunnel?.RsdPort}`,
+        );
+      } catch (err) {
+        log.warn(`Failed to recreate USB tunnel for ${udid}: ${err?.message ?? err}`);
+      }
+    })();
+    this._reconnectTasks.set(udid, task);
+    void task.finally(() => {
+      this._reconnectTasks.delete(udid);
+    });
+  }
+
+  /**
+   * Periodically probe registry RSD endpoints and recreate USB tunnels that stopped forwarding.
+   *
+   * @param {number} [intervalMs]
+   * @param {number} [probeMs]
+   */
+  _startRsdHealthWatch(intervalMs = 30000, probeMs = 3000) {
+    if (this._rsdHealthTimer) {
+      return;
+    }
+    this._rsdHealthTimer = setInterval(() => {
+      void this._runRsdHealthChecks(probeMs);
+    }, intervalMs);
+    this._rsdHealthTimer.unref?.();
+    log.info(`RSD health watch enabled (every ${intervalMs}ms, TCP probe ${probeMs}ms)`);
+    setTimeout(() => {
+      void this._runRsdHealthChecks(probeMs);
+    }, 5000).unref?.();
+  }
+
+  /**
+   * @param {number} probeMs
+   */
+  async _runRsdHealthChecks(probeMs) {
+    if (this._isCleaningUp || !this.registry?.tunnels) {
+      return;
+    }
+
+    for (const [udid, entry] of Object.entries(this.registry.tunnels)) {
+      if (!entry?.address || !entry?.rsdPort || this._reconnectTasks.has(udid)) {
+        continue;
+      }
+      const reachable = await isTunnelRsdReachable(
+        entry.address,
+        entry.rsdPort,
+        probeMs,
+      );
+      if (reachable) {
+        continue;
+      }
+      log.warn(
+        `RSD health check failed for ${udid} at ${entry.address}:${entry.rsdPort}; ` +
+          'registry entry appears stale',
+      );
+      if (this._usbDevices.has(udid)) {
+        this._forceRecreateUsbTunnel(udid);
+      }
+    }
+  }
+
+  /**
    * @param {string} udid
    * @returns {Promise<AppleTVReconnectResult>}
    */
@@ -706,13 +821,7 @@ class TunnelCreator {
     }
     const tunnel = await TunnelManager.getTunnel(result.socket);
 
-    const packetStreamPort = this._packetStreamBasePort++;
-    const packetStreamServer = new PacketStreamServer(packetStreamPort);
-    await packetStreamServer.start();
-    const consumer = packetStreamServer.getPacketConsumer();
-    if (consumer && tunnel?.addPacketConsumer) {
-      tunnel.addPacketConsumer(consumer);
-    }
+    const {packetStreamPort, packetStreamServer} = await this._attachPacketStream(tunnel, udid);
 
     this._appletvResources.push({
       tunnel,
@@ -1039,6 +1148,10 @@ async function main() {
       'Delay between tunnel recreation attempts in milliseconds (default 1000)',
       (value) => parsePositiveIntegerOption(value, 'disconnect retry interval'),
       1000,
+    )
+    .option(
+      '--enable-packet-stream',
+      'Enable L4 packet tap and PacketStreamServer (required for syslog-over-tunnel; adds per-packet overhead)',
     );
 
   program.parse(process.argv);
@@ -1051,6 +1164,12 @@ async function main() {
   const shouldRunAppleTVFlow = !hasRequestedUdids || hasRequestedAppleTVIds;
 
   const tunnelCreator = new TunnelCreator();
+  tunnelCreator.enablePacketStream = options.enablePacketStream === true;
+  if (!tunnelCreator.enablePacketStream) {
+    log.info(
+      'Packet stream tap is off (default). Pass --enable-packet-stream for syslog/packet capture.',
+    );
+  }
   const cleanupOnce = setupCleanupHandlers(tunnelCreator);
 
   try {
@@ -1143,6 +1262,7 @@ async function main() {
         socket: resource.tlsSocket,
       })
     ));
+    tunnelCreator._startRsdHealthWatch();
 
     const successfulUsb = usbResults.filter((r) => r.success);
     log.info('\n=== TUNNEL CREATION SUMMARY ===');
@@ -1175,7 +1295,7 @@ await main();
  * @property {string} udid
  * @property {string} address
  * @property {number} rsdPort
- * @property {number} packetStreamPort
+ * @property {number} [packetStreamPort]
  */
 
 /**
@@ -1199,7 +1319,7 @@ await main();
 /**
  * @typedef {Object} AppleTVTunnelResource
  * Resource handle for cleanup of a single Apple TV (WiFi) tunnel.
- * @property {import('appium-ios-remotexpc').PacketStreamServer} packetStreamServer
+ * @property {import('appium-ios-remotexpc').PacketStreamServer | null} [packetStreamServer]
  * @property {import('appium-ios-remotexpc').AppleTVTunnelService} tunnelService
  * @property {string} udid
  * @property {AppleTVTunnelConnection} tunnel

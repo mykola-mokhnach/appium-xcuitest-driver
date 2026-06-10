@@ -348,6 +348,9 @@ export const desiredCapConstraints = {
   enforceAppInstall: {
     isBoolean: true,
   },
+  useZipConduitInstall: {
+    isBoolean: true,
+  },
   skipTriggerInputEventAfterSendkeys: {
     isBoolean: true,
   },

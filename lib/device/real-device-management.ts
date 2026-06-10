@@ -119,7 +119,11 @@ export class RealDevice {
 
     // first try with zip_conduit service for iOS/tvOS 18+ and IPA only
     // fall through to the AFC + installation_proxy path for other cases/zip_conduit failure
-    if (useRemoteXPC && (await this.installViaZipConduit(appPath, timeoutMs))) {
+    if (
+      useRemoteXPC &&
+      this.driverOpts.useZipConduitInstall !== false &&
+      (await this.installViaZipConduit(appPath, timeoutMs))
+    ) {
       this.log.info(
         `The installation of '${bundleId}' succeeded after ${timer.getDuration().asMilliSeconds.toFixed(0)}ms`,
       );

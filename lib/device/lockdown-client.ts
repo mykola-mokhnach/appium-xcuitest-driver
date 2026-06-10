@@ -151,14 +151,6 @@ export class LockdownClient {
     }
   }
 
-  private async requireRemotexpcModule(): Promise<RemoteXPCEsmModule> {
-    const remotexpc = await tryGetRemoteXPCModule();
-    if (!remotexpc) {
-      throw new Error(`appium-ios-remotexpc module is not initialized for '${this.udid}'.`);
-    }
-    return remotexpc;
-  }
-
   /**
    * Legacy ios-device can provide inconsistent offset payloads. Normalize to a final offset in
    * minutes for consumers.
