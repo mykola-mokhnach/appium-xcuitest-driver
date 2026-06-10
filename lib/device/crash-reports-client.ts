@@ -1,4 +1,4 @@
-import {getRemoteXPCServices} from './remotexpc-utils';
+import {getRemoteXPCServices, wrapRemoteXPCConnectionError} from './remotexpc-utils';
 import {log} from '../logger';
 import type {CrashReportsService as RemoteXPCCrashReportsService} from 'appium-ios-remotexpc';
 
@@ -38,10 +38,9 @@ export class CrashReportsClient {
       const crashReportsService = await Services.startCrashReportsService(udid);
       return new CrashReportsClient(crashReportsService);
     } catch (err: any) {
-      throw new Error(
-        `Failed to create crash reports client via RemoteXPC: ${err.message}. ` +
-          'Ensure appium-ios-remotexpc is installed and the device is supported.',
-        {cause: err},
+      throw wrapRemoteXPCConnectionError(
+        err,
+        'Failed to create crash reports client via RemoteXPC',
       );
     }
   }
@@ -100,10 +99,7 @@ export class CrashReportsClient {
     return results;
   }
 
-  private async _collectCrashReportPaths(
-    dirPath: string,
-    results: string[],
-  ): Promise<void> {
+  private async _collectCrashReportPaths(dirPath: string, results: string[]): Promise<void> {
     let children: string[];
     try {
       children = await this.crashReportsService.ls(dirPath, 1);

@@ -1,10 +1,15 @@
-import _ from 'lodash';
+import {isEmpty} from '../utils';
 import {services, INSTRUMENT_CHANNEL} from 'appium-ios-device';
 import type {AppiumLogger} from '@appium/types';
 import type {Devicectl} from 'node-devicectl';
-import {isIos17OrNewerPlatform, isIos18OrNewerPlatform} from '../utils';
+import {isIos17OrNewerPlatform, isIos18OrNewerPlatform} from '../commands/helpers';
 import {InstallationProxyClient} from './installation-proxy-client';
-import {getRemoteXPCServices} from './remotexpc-utils';
+import type {DVTInstruments} from 'appium-ios-remotexpc';
+import {
+  formatRemoteXPCFallbackLog,
+  getRemoteXPCServices,
+  wrapRemoteXPCConnectionError,
+} from './remotexpc-utils';
 
 type TerminateAppResult =
   | {terminated: true; pid: number}
@@ -24,7 +29,7 @@ export class AppTerminationClient {
       try {
         result = await this.terminateRemoteXPC(bundleId);
       } catch (err: any) {
-        this.log.warn(`Failed to terminate '${bundleId}' via RemoteXPC: ${err.message}`);
+        this.log.warn(formatRemoteXPCFallbackLog(`terminate '${bundleId}'`, err));
         result = await this.terminateLegacy(bundleId);
       }
     } else {
@@ -49,8 +54,16 @@ export class AppTerminationClient {
   }
 
   private async terminateRemoteXPC(bundleId: string): Promise<TerminateAppResult> {
-    const Services = await getRemoteXPCServices();
-    const dvt = await Services.startDVTService(this.udid);
+    let dvt: DVTInstruments;
+    try {
+      const Services = await getRemoteXPCServices();
+      dvt = await Services.startDVTService(this.udid);
+    } catch (err) {
+      throw wrapRemoteXPCConnectionError(
+        err,
+        `Failed to start RemoteXPC DVT service to terminate '${bundleId}'`,
+      );
+    }
     try {
       const pid = await dvt.processControl.getPidForBundleIdentifier(bundleId);
       if (!pid) {
@@ -81,7 +94,7 @@ export class AppTerminationClient {
         const pids = (await this.devicectl.listProcesses())
           .filter(({executable}) => executable.endsWith(`/${executableName}`))
           .map(({processIdentifier}) => processIdentifier);
-        if (_.isEmpty(pids)) {
+        if (isEmpty(pids)) {
           return {terminated: false, reason: 'not_running'};
         }
         await this.devicectl.sendSignalToProcess(pids[0], 2);

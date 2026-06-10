@@ -4,11 +4,12 @@ import type {LockdownService} from 'appium-ios-remotexpc';
 import type {LockdownInfo} from '../commands/types';
 import type {XCUITestDriverOpts} from '../driver';
 import {log as defaultLogger} from '../logger';
-import {isIos18OrNewer} from '../utils';
+import {isIos18OrNewer} from '../commands/helpers';
 import {
   getLastRemoteXPCOptionalImportError,
   tryGetRemoteXPCModule,
   tryGetRemoteXPCUsbMuxStrategy,
+  wrapRemoteXPCConnectionError,
   type RemoteXPCEsmModule,
 } from './remotexpc-utils';
 
@@ -150,6 +151,14 @@ export class LockdownClient {
     }
   }
 
+  private async requireRemotexpcModule(): Promise<RemoteXPCEsmModule> {
+    const remotexpc = await tryGetRemoteXPCModule();
+    if (!remotexpc) {
+      throw new Error(`appium-ios-remotexpc module is not initialized for '${this.udid}'.`);
+    }
+    return remotexpc;
+  }
+
   /**
    * Legacy ios-device can provide inconsistent offset payloads. Normalize to a final offset in
    * minutes for consumers.
@@ -244,9 +253,7 @@ export class LockdownClient {
         lockdown.close();
       }
     } catch (err) {
-      throw new Error(`Tunnel lockdown failed for '${this.udid}': ${(err as Error).message}`, {
-        cause: err,
-      });
+      throw wrapRemoteXPCConnectionError(err, `Tunnel lockdown failed for '${this.udid}'`);
     }
   }
 }

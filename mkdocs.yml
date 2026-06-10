@@ -55,6 +55,7 @@ nav:
           - reference/execute-methods.md
       - Element Management:
           - reference/locator-strategies.md
+          - reference/xpath-extensions.md
           - reference/ios-predicate.md
           - reference/element-attributes.md
   - Guides:

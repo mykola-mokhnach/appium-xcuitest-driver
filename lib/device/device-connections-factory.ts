@@ -1,16 +1,17 @@
-import _ from 'lodash';
+import {isEmpty} from '../utils';
 import net from 'node:net';
 import {util, timing} from 'appium/support';
 import {utilities} from 'appium-ios-device';
 import {checkPortStatus} from 'portscanner';
 import {waitForCondition} from 'asyncbox';
 import type {AppiumLogger} from '@appium/types';
-import type {DevicePortForwarder} from 'appium-ios-remotexpc';
+import type {DevicePortForwarder, TunnelEndpoint} from 'appium-ios-remotexpc';
 import {
   getLastRemoteXPCOptionalImportError,
   tryGetRemoteXPCUsbMuxStrategy,
+  wrapRemoteXPCConnectionError,
 } from './remotexpc-utils';
-import {isIos18OrNewerPlatform} from '../utils';
+import {isIos18OrNewerPlatform} from '../commands/helpers';
 import type {Socket} from 'node:net';
 
 const LOCALHOST = '127.0.0.1';
@@ -287,7 +288,7 @@ export class DeviceConnectionsFactory {
     // the `strict` argument enforces to match keys having both `udid` and `port`
     // if they are defined
     // while in non-strict mode keys having any of these are going to be matched
-    return _.keys(DeviceConnectionsFactory._connectionsMapping).filter((key) =>
+    return Object.keys(DeviceConnectionsFactory._connectionsMapping).filter((key) =>
       strict && udid && port
         ? key === this._toKey(udid, port)
         : (udid && key.startsWith(this._udidAsToken(udid))) ||
@@ -325,10 +326,10 @@ export class DeviceConnectionsFactory {
         (devicePort ? `, device port ${devicePort}` : ''),
     );
     this.log.debug(
-      `Cached connections count: ${_.size(DeviceConnectionsFactory._connectionsMapping)}`,
+      `Cached connections count: ${Object.keys(DeviceConnectionsFactory._connectionsMapping).length}`,
     );
     const connectionsOnPort = this.listConnections(null, port);
-    if (!_.isEmpty(connectionsOnPort)) {
+    if (!isEmpty(connectionsOnPort)) {
       this.log.info(
         `Found cached connections on port #${port}: ${JSON.stringify(connectionsOnPort)}`,
       );
@@ -340,7 +341,7 @@ export class DeviceConnectionsFactory {
 
     const currentKey = this._toKey(udid, port);
     if (usePortForwarding) {
-      if (!_.isInteger(devicePort)) {
+      if (!Number.isInteger(devicePort)) {
         throw new Error('devicePort is required when usePortForwarding is true');
       }
       await this._startAndRegisterPortForwarder(
@@ -375,7 +376,7 @@ export class DeviceConnectionsFactory {
     );
 
     const keys = this.listConnections(udid, port, true);
-    if (_.isEmpty(keys)) {
+    if (isEmpty(keys)) {
       this.log.info('No cached connections have been found');
       return;
     }
@@ -385,7 +386,7 @@ export class DeviceConnectionsFactory {
       delete DeviceConnectionsFactory._connectionsMapping[key];
     }
     this.log.debug(
-      `Cached connections count: ${_.size(DeviceConnectionsFactory._connectionsMapping)}`,
+      `Cached connections count: ${Object.keys(DeviceConnectionsFactory._connectionsMapping).length}`,
     );
   }
 
@@ -409,7 +410,7 @@ export class DeviceConnectionsFactory {
     let isPortBusy = (await checkPortStatus(port, LOCALHOST)) === 'open';
     if (isPortBusy) {
       this.log.warn(`Port #${port} is busy. Did you quit the previous driver session(s) properly?`);
-      if (!_.isEmpty(connectionsOnPort)) {
+      if (!isEmpty(connectionsOnPort)) {
         this.log.info('Trying to release the port');
         for (const key of await this._releaseProxiedConnections(connectionsOnPort)) {
           delete DeviceConnectionsFactory._connectionsMapping[key];
@@ -545,7 +546,16 @@ export class DeviceConnectionsFactory {
       );
     }
 
-    const tunnelConnection = await remotexpc.Services.getTunnelForDevice(udid);
+    // We cannot use the legacy fallback past this point as the device is not accessible via USB/local usbmux
+    let tunnelConnection: TunnelEndpoint;
+    try {
+      tunnelConnection = await remotexpc.Services.getTunnelForDevice(udid);
+    } catch (err) {
+      throw wrapRemoteXPCConnectionError(
+        err,
+        `Cannot create port forwarder via RemoteXPC tunnel for '${udid}'`,
+      );
+    }
     const tunnelHost = tunnelConnection.host;
     this.log.debug(
       `Using appium-ios-remotexpc tunnel strategy for '${udid}' through '${tunnelHost}'`,

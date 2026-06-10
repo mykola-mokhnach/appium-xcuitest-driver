@@ -12,16 +12,14 @@ import type {
   DriverCaps,
   DriverOpts,
 } from '@appium/types';
-import _ from 'lodash';
 import {LRUCache} from 'lru-cache';
 import EventEmitter from 'node:events';
 import {setTimeout as delay} from 'node:timers/promises';
 import {onDownloadApp, onPostConfigureApp, verifyApplicationPlatform} from './commands/app-install';
 import {SUPPORTED_EXTENSIONS, UDID_AUTO} from './commands/constants';
-import {removeAllSessionWebSocketHandlers, shouldSetInitialSafariUrl} from './commands/session';
 import {
-  SAFARI_BUNDLE_ID,
   DEFAULT_TIMEOUT_KEY,
+  SAFARI_BUNDLE_ID,
   checkAppPresent,
   getAndCheckIosSdkVersion,
   getAndCheckXcodeVersion,
@@ -29,7 +27,10 @@ import {
   normalizeCommandTimeouts,
   normalizePlatformVersion,
   printUser,
-} from './utils';
+  removeAllSessionWebSocketHandlers,
+  shouldSetInitialSafariUrl,
+} from './commands/helpers';
+import {isEmpty, isPlainObject, memoize, upperFirst} from './utils';
 import * as activeAppInfoCommands from './commands/active-app-info';
 import * as alertCommands from './commands/alert';
 import * as appManagementCommands from './commands/app-management';
@@ -73,7 +74,8 @@ import * as sourceCommands from './commands/source';
 import * as simctlCommands from './commands/simctl';
 import * as timeoutCommands from './commands/timeouts';
 import * as webCommands from './commands/web';
-import * as wdaCommands from './commands/wda';
+import {start, startWdaSession} from './commands/wda/startup';
+import {stop} from './commands/wda/stop';
 import * as xctestCommands from './commands/xctest';
 import * as xctestRecordScreenCommands from './commands/xctest-record-screen';
 import * as increaseContrastCommands from './commands/increase-contrast';
@@ -108,16 +110,11 @@ import type {PerfRecorder} from './commands/performance';
 import type {AudioRecorder} from './commands/record-audio';
 import type {NetworkMonitorSession} from './device/network-monitor-session';
 import type {ScreenRecorder} from './commands/recordscreen';
-import type {IOSDeviceLog} from './device/log/ios-device-log';
-import type {IOSSimulatorLog} from './device/log/ios-simulator-log';
-import type {IOSCrashLog} from './device/log/ios-crash-log';
-import type {SafariConsoleLog} from './device/log/safari-console-log';
-import type {SafariNetworkLog} from './device/log/safari-network-log';
-import type {IOSPerformanceLog} from './device/log/ios-performance-log';
 import type {RemoteDebugger} from 'appium-remote-debugger';
 import type {XcodeVersion} from 'appium-xcode';
 import type {Simulator} from 'appium-ios-simulator';
-import type {IOSLog} from './device/log/ios-log';
+import type {DriverLogs} from './commands/log';
+import {sessionClaimHandler} from './session-claim-handler';
 
 const SHUTDOWN_OTHER_FEAT_NAME = 'shutdown_other_sims';
 
@@ -231,14 +228,6 @@ export interface AutInstallationState {
 export type XCUITestDriverOpts = DriverOpts<XCUITestDriverConstraints>;
 
 export type W3CXCUITestDriverCaps = W3CDriverCaps<XCUITestDriverConstraints>;
-export interface DriverLogs {
-  syslog?: IOSDeviceLog | IOSSimulatorLog;
-  crashlog?: IOSCrashLog;
-  safariConsole?: SafariConsoleLog;
-  safariNetwork?: SafariNetworkLog;
-  performance?: IOSPerformanceLog;
-}
-
 export class XCUITestDriver
   extends BaseDriver<XCUITestDriverConstraints, StringRecord>
   implements ExternalDriver<XCUITestDriverConstraints, FullContext | string, StringRecord>
@@ -719,12 +708,12 @@ export class XCUITestDriver
   /*--------+
    | WDA    |
    +--------*/
-  startWda = wdaCommands.start;
+  startWda = start;
   /**
    * @deprecated This method should be made protected/private.
    */
-  startWdaSession = wdaCommands.startWdaSession;
-  stopWda = wdaCommands.stop;
+  startWdaSession = startWdaSession;
+  stopWda = stop;
 
   /*--------+
    | XCTEST |
@@ -777,11 +766,11 @@ export class XCUITestDriver
     };
     this.resetIos();
     this.settings = new DeviceSettings(DEFAULT_SETTINGS, this.onSettingsUpdate.bind(this));
-    this.logs = {};
+    this.logs = {} as DriverLogs;
     this._networkMonitorSession = null;
     // memoize functions here, so that they are done on a per-instance basis
     for (const fn of MEMOIZED_FUNCTIONS) {
-      this[fn] = _.memoize(this[fn]);
+      this[fn] = memoize(this[fn]);
     }
     this.lifecycleData = {};
     this._audioRecorder = null;
@@ -806,13 +795,16 @@ export class XCUITestDriver
     return this._remote;
   }
 
-  get driverData(): Record<string, any> {
-    // TODO fill out resource info here
+  override get driverData(): Record<string, any> {
     return {};
   }
 
   get device(): Simulator | RealDevice {
     return this._device;
+  }
+
+  async onIpcInit(): Promise<void> {
+    await sessionClaimHandler.registerActiveSession(this);
   }
 
   // Override methods from BaseDriver
@@ -844,15 +836,15 @@ export class XCUITestDriver
       // update the udid with what is actually used
       caps.udid = this.opts.udid;
       // ensure we track nativeWebTap capability as a setting as well
-      if (_.has(this.opts, 'nativeWebTap')) {
+      if (Object.hasOwn(this.opts, 'nativeWebTap')) {
         await this.updateSettings({nativeWebTap: this.opts.nativeWebTap});
       }
       // ensure we track nativeWebTapStrict capability as a setting as well
-      if (_.has(this.opts, 'nativeWebTapStrict')) {
+      if (Object.hasOwn(this.opts, 'nativeWebTapStrict')) {
         await this.updateSettings({nativeWebTapStrict: this.opts.nativeWebTapStrict});
       }
       // ensure we track useJSONSource capability as a setting as well
-      if (_.has(this.opts, 'useJSONSource')) {
+      if (Object.hasOwn(this.opts, 'useJSONSource')) {
         await this.updateSettings({useJSONSource: this.opts.useJSONSource});
       }
 
@@ -862,26 +854,29 @@ export class XCUITestDriver
       };
       if (
         'elementResponseAttributes' in this.opts &&
-        _.isString(this.opts.elementResponseAttributes)
+        typeof this.opts.elementResponseAttributes === 'string'
       ) {
         wdaSettings.elementResponseAttributes = this.opts.elementResponseAttributes;
       }
       if (
         'shouldUseCompactResponses' in this.opts &&
-        _.isBoolean(this.opts.shouldUseCompactResponses)
+        typeof this.opts.shouldUseCompactResponses === 'boolean'
       ) {
         wdaSettings.shouldUseCompactResponses = this.opts.shouldUseCompactResponses;
       }
       if (
         'mjpegServerScreenshotQuality' in this.opts &&
-        _.isNumber(this.opts.mjpegServerScreenshotQuality)
+        typeof this.opts.mjpegServerScreenshotQuality === 'number'
       ) {
         wdaSettings.mjpegServerScreenshotQuality = this.opts.mjpegServerScreenshotQuality;
       }
-      if ('mjpegServerFramerate' in this.opts && _.isNumber(this.opts.mjpegServerFramerate)) {
+      if (
+        'mjpegServerFramerate' in this.opts &&
+        typeof this.opts.mjpegServerFramerate === 'number'
+      ) {
         wdaSettings.mjpegServerFramerate = this.opts.mjpegServerFramerate;
       }
-      if (_.has(this.opts, 'screenshotQuality')) {
+      if (Object.hasOwn(this.opts, 'screenshotQuality')) {
         this.log.info(`Setting the quality of phone screenshot: '${this.opts.screenshotQuality}'`);
         wdaSettings.screenshotQuality = this.opts.screenshotQuality;
       }
@@ -899,16 +894,20 @@ export class XCUITestDriver
   }
 
   override async deleteSession(sessionId?: string): Promise<void> {
+    sessionClaimHandler.unregisterActiveSession(this);
+
     await removeAllSessionWebSocketHandlers.bind(this)();
 
-    for (const recorder of _.compact([this._recentScreenRecorder, this._audioRecorder])) {
+    for (const recorder of [this._recentScreenRecorder, this._audioRecorder].filter(
+      (r): r is NonNullable<typeof r> => Boolean(r),
+    )) {
       await recorder.interrupt(true);
       await recorder.cleanup();
     }
     await this._networkMonitorSession?.interrupt();
     this._networkMonitorSession = null;
 
-    if (!_.isEmpty(this._perfRecorders)) {
+    if (!isEmpty(this._perfRecorders)) {
       await Promise.all(this._perfRecorders.map((x) => x.stop(true)));
       this._perfRecorders = [];
     }
@@ -949,15 +948,17 @@ export class XCUITestDriver
     }
 
     await Promise.all(
-      _.values(this.logs).map(async (logObj) => {
-        await (logObj as IOSLog<any, any>).stopCapture();
+      Object.values(this.logs).map(async (logObj) => {
+        try {
+          await logObj?.stopCapture();
+        } catch {}
+        logObj?.removeAllListeners();
       }),
     );
-    _.values(this.logs).forEach((x: any) => x?.removeAllListeners?.());
     if (this._bidiServerLogListener) {
       this.log.unwrap().off('log', this._bidiServerLogListener);
     }
-    this.logs = {};
+    this.logs = {} as DriverLogs;
 
     if (this.mjpegStream) {
       this.log.info('Closing MJPEG stream');
@@ -1004,7 +1005,7 @@ export class XCUITestDriver
     }
 
     // make sure that the capabilities have one of `app` or `bundleId`
-    if (_.toLower(caps.browserName) !== 'safari' && !caps.app && !caps.bundleId) {
+    if (String(caps.browserName).toLowerCase() !== 'safari' && !caps.app && !caps.bundleId) {
       this.log.info(
         'The desired capabilities include neither an app nor a bundleId. ' +
           'WebDriverAgent will be started without the default app',
@@ -1020,10 +1021,10 @@ export class XCUITestDriver
 
     const verifyProcessArgument = (processArguments) => {
       const {args, env} = processArguments;
-      if (!_.isNil(args) && !_.isArray(args)) {
+      if (args != null && !Array.isArray(args)) {
         throw this.log.errorWithException('processArguments.args must be an array of strings');
       }
-      if (!_.isNil(env) && !_.isPlainObject(env)) {
+      if (env != null && !isPlainObject(env)) {
         throw this.log.errorWithException(
           'processArguments.env must be an object <key,value> pair {a:b, c:d}',
         );
@@ -1032,7 +1033,7 @@ export class XCUITestDriver
 
     // `processArguments` should be JSON string or an object with arguments and/ environment details
     if (caps.processArguments) {
-      if (_.isString(caps.processArguments)) {
+      if (typeof caps.processArguments === 'string') {
         try {
           // try to parse the string as JSON
           caps.processArguments = JSON.parse(caps.processArguments as string);
@@ -1043,7 +1044,7 @@ export class XCUITestDriver
               `Both environment and argument can be null. Error: ${err}`,
           );
         }
-      } else if (_.isPlainObject(caps.processArguments)) {
+      } else if (isPlainObject(caps.processArguments)) {
         verifyProcessArgument(caps.processArguments);
       } else {
         throw this.log.errorWithException(
@@ -1074,7 +1075,7 @@ export class XCUITestDriver
       );
     }
 
-    if (_.isString(caps.webDriverAgentUrl)) {
+    if (typeof caps.webDriverAgentUrl === 'string') {
       try {
         new URL(caps.webDriverAgentUrl);
       } catch {
@@ -1102,11 +1103,11 @@ export class XCUITestDriver
 
     if (caps.permissions) {
       try {
-        for (const [bundleId, perms] of _.toPairs(JSON.parse(caps.permissions))) {
-          if (!_.isString(bundleId)) {
+        for (const [bundleId, perms] of Object.entries(JSON.parse(caps.permissions))) {
+          if (typeof bundleId !== 'string') {
             throw new Error(`'${JSON.stringify(bundleId)}' must be a string`);
           }
-          if (!_.isPlainObject(perms)) {
+          if (!isPlainObject(perms)) {
             throw new Error(`'${JSON.stringify(perms)}' must be a JSON object`);
           }
         }
@@ -1192,7 +1193,7 @@ export class XCUITestDriver
     let didMerge = false;
     // this.cliArgs should never include anything we do not expect.
     for (const [key, value] of Object.entries(this.cliArgs ?? {})) {
-      if (_.has(this.opts, key)) {
+      if (Object.hasOwn(this.opts, key)) {
         this.log.info(
           `CLI arg '${key}' with value '${value}' overwrites value '${this.opts[key]}' sent in via caps)`,
         );
@@ -1225,7 +1226,7 @@ export class XCUITestDriver
         usePortForwarding: this.isRealDevice(),
       });
     } catch (error) {
-      if (_.isUndefined(this.opts.mjpegServerPort)) {
+      if (this.opts.mjpegServerPort === undefined) {
         this.log.warn(
           `Cannot forward the device port ${DEFAULT_MJPEG_SERVER_PORT} to the local port ${DEFAULT_MJPEG_SERVER_PORT}. ` +
             `Certain features, like MJPEG-based screen recording, will be unavailable during this session. ` +
@@ -1261,6 +1262,9 @@ export class XCUITestDriver
     this._device = device;
     this.opts.udid = udid;
 
+    await sessionClaimHandler.registerActiveSession(this);
+    await sessionClaimHandler.claimSessionUdid(this);
+
     if (this.opts.simulatorDevicesSetPath) {
       if (realDevice) {
         this.log.info(
@@ -1291,13 +1295,13 @@ export class XCUITestDriver
     }
     this.caps.platformVersion = this.opts.platformVersion;
 
-    if (_.isEmpty(this.xcodeVersion) && (this.isXcodebuildNeeded() || this.isSimulator())) {
+    if (isEmpty(this.xcodeVersion) && (this.isXcodebuildNeeded() || this.isSimulator())) {
       // no `webDriverAgentUrl`, or on a simulator, so we need an Xcode version
       this.xcodeVersion = await getAndCheckXcodeVersion();
     }
     this.logEvent('xcodeDetailsRetrieved');
 
-    if (_.toLower(this.opts.browserName) === 'safari') {
+    if (String(this.opts.browserName).toLowerCase() === 'safari') {
       this.log.info('Safari test requested');
       this.safari = true;
       this.opts.app = undefined;
@@ -1343,7 +1347,7 @@ export class XCUITestDriver
       }
     })();
 
-    const memoizedLogInfo = _.memoize(() => {
+    const memoizedLogInfo = memoize(() => {
       this.log.info(
         "'skipLogCapture' is set. Skipping starting logs such as crash, system, safari console and safari network.",
       );
@@ -1392,7 +1396,7 @@ export class XCUITestDriver
     if (this.isSimulator()) {
       if (this.opts.permissions) {
         this.log.debug('Setting the requested permissions before WDA is started');
-        for (const [bundleId, permissionsMapping] of _.toPairs(
+        for (const [bundleId, permissionsMapping] of Object.entries(
           JSON.parse(this.opts.permissions as string),
         )) {
           await (this.device as Simulator).setPermissions(
@@ -1405,7 +1409,7 @@ export class XCUITestDriver
 
     await this.startWda();
 
-    if (_.isString(this.opts.orientation)) {
+    if (typeof this.opts.orientation === 'string') {
       await this.setInitialOrientation(this.opts.orientation);
       this.logEvent('orientationSet');
     }
@@ -1419,7 +1423,7 @@ export class XCUITestDriver
     if (this.isSafari()) {
       if (shouldSetInitialSafariUrl(this.opts)) {
         this.log.info(`About to set the initial Safari URL to '${this.getCurrentUrl()}'`);
-        if (_.isNil(this.opts.safariInitialUrl) && _.isNil(this.opts.initialDeeplinkUrl)) {
+        if (this.opts.safariInitialUrl == null && this.opts.initialDeeplinkUrl == null) {
           this.log.info(`Use the 'safariInitialUrl' capability to customize it`);
         }
         await this.setUrl(this.getCurrentUrl() || this.getDefaultUrl());
@@ -1474,10 +1478,10 @@ export class XCUITestDriver
     }
 
     const promises: Promise<any>[] = ['reduceMotion', 'reduceTransparency', 'autoFillPasswords']
-      .filter((optName) => _.isBoolean(this.opts[optName]))
+      .filter((optName) => typeof this.opts[optName] === 'boolean')
       .map((optName) => {
         this.log.info(`Setting ${optName} to ${this.opts[optName]}`);
-        return device[`set${_.upperFirst(optName)}`](this.opts[optName]);
+        return device[`set${upperFirst(optName)}`](this.opts[optName]);
       });
     await Promise.all(promises);
 
@@ -1505,7 +1509,7 @@ export class XCUITestDriver
     }
 
     // check for supported build-in apps
-    switch (_.toLower(this.opts.app)) {
+    switch (String(this.opts.app).toLowerCase()) {
       case 'settings':
         this.opts.bundleId = 'com.apple.Preferences';
         this.opts.app = undefined;
@@ -1637,14 +1641,14 @@ export class XCUITestDriver
       devicePreferences.SimulatorWindowCenter = this.opts.simulatorWindowCenter;
     }
 
-    if (_.isInteger(this.opts.simulatorStartupTimeout)) {
+    if (Number.isInteger(this.opts.simulatorStartupTimeout)) {
       runOpts.startupTimeout = this.opts.simulatorStartupTimeout;
     }
 
     // This is to workaround XCTest bug about changing Simulator
     // orientation is not synchronized to the actual window orientation
     const orientation =
-      _.isString(this.opts.orientation) && (this.opts.orientation as string).toUpperCase();
+      typeof this.opts.orientation === 'string' && (this.opts.orientation as string).toUpperCase();
     switch (orientation) {
       case 'LANDSCAPE':
         devicePreferences.SimulatorWindowOrientation = 'LandscapeLeft';
@@ -1805,7 +1809,7 @@ export class XCUITestDriver
     const appIds: string[] = await Promise.all(
       appPaths.map((appPath) => this.appInfosCache.extractBundleId(appPath)),
     );
-    for (const [appId, appPath] of _.zip(appIds, appPaths)) {
+    for (const [appId, appPath] of appIds.map((v, i) => [v, appPaths[i]] as const)) {
       if (this.isRealDevice()) {
         await installToRealDevice.bind(this)(appPath, appId, {
           skipUninstall: true, // to make the behavior as same as UIA2
@@ -1820,7 +1824,7 @@ export class XCUITestDriver
   }
 
   async setInitialOrientation(orientation: string): Promise<void> {
-    const dstOrientation = _.toUpper(orientation);
+    const dstOrientation = String(orientation).toUpperCase();
     if (!SUPPORTED_ORIENATIONS.includes(dstOrientation)) {
       this.log.debug(
         `The initial orientation value '${orientation}' is unknown. ` +
@@ -1877,7 +1881,7 @@ export class XCUITestDriver
 
   _getCommandTimeout(cmdName?: string): number | undefined {
     if (this.opts.commandTimeouts) {
-      if (cmdName && _.has(this.opts.commandTimeouts, cmdName)) {
+      if (cmdName && Object.hasOwn(this.opts.commandTimeouts, cmdName)) {
         return this.opts.commandTimeouts[cmdName];
       }
       return this.opts.commandTimeouts[DEFAULT_TIMEOUT_KEY];

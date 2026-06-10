@@ -1,10 +1,9 @@
-import _ from 'lodash';
 import {Devicectl} from 'node-devicectl';
 import {utilities} from 'appium-ios-device';
 import {log} from '../logger';
-import {isIos18OrNewer} from '../utils';
+import {isIos18OrNewer} from '../commands/helpers';
 import type {XCUITestDriverOpts} from '../driver';
-import {tryGetRemoteXPCServices} from './remotexpc-utils';
+import {formatRemoteXPCFallbackLog, tryGetRemoteXPCServices} from './remotexpc-utils';
 import type {RemoteXPCServices} from './remotexpc-utils';
 
 export class ConnectedDevicesClient {
@@ -44,10 +43,7 @@ export class ConnectedDevicesClient {
 
     // Tunnels rejected (only other status after fulfilled) → use legacy; throw if legacy failed
     const err = tunnelSettled.reason;
-    log.info(
-      'Tunnel registry unavailable; using legacy devices listing instead. ' +
-        `Original error: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    log.warn(formatRemoteXPCFallbackLog('devices listing', err));
     if (legacySettled.status === 'rejected') {
       throw legacySettled.reason instanceof Error
         ? legacySettled.reason
@@ -58,7 +54,7 @@ export class ConnectedDevicesClient {
 
   private isPreferDevicectlEnabled(): boolean {
     return ['yes', 'true', '1'].includes(
-      _.toLower(process.env.APPIUM_XCUITEST_PREFER_DEVICECTL ?? ''),
+      String(process.env.APPIUM_XCUITEST_PREFER_DEVICECTL ?? '').toLowerCase(),
     );
   }
 

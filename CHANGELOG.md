@@ -1,3 +1,93 @@
+## [11.10.0](https://github.com/appium/appium-xcuitest-driver/compare/v11.9.1...v11.10.0) (2026-06-09)
+
+### Features
+
+* bump WDA to 14 for Xcode 27 build support ([#2865](https://github.com/appium/appium-xcuitest-driver/issues/2865)) ([fad5172](https://github.com/appium/appium-xcuitest-driver/commit/fad5172c03565417061dfb1196dc1f2d6270d824))
+
+## [11.9.1](https://github.com/appium/appium-xcuitest-driver/compare/v11.9.0...v11.9.1) (2026-06-08)
+
+### Miscellaneous Chores
+
+* Refactor css locator transformer ([#2864](https://github.com/appium/appium-xcuitest-driver/issues/2864)) ([74c6765](https://github.com/appium/appium-xcuitest-driver/commit/74c67655048d15f83053e17736d3f8a459d0cf67))
+
+## [11.9.0](https://github.com/appium/appium-xcuitest-driver/compare/v11.8.1...v11.9.0) (2026-06-03)
+
+### Features
+
+* Automatically terminate obsolete sessions using device id to be claimed by the current one ([#2863](https://github.com/appium/appium-xcuitest-driver/issues/2863)) ([2d82163](https://github.com/appium/appium-xcuitest-driver/commit/2d8216386d40f6c5a4f5382a9179b6306165c1d2))
+
+## [11.8.1](https://github.com/appium/appium-xcuitest-driver/compare/v11.8.0...v11.8.1) (2026-06-03)
+
+### Bug Fixes
+
+* Video attachments path for Xcode 26.5+ ([#2862](https://github.com/appium/appium-xcuitest-driver/issues/2862)) ([174ff70](https://github.com/appium/appium-xcuitest-driver/commit/174ff707cba80217197d81f9ee917e9abf66f973))
+
+## [11.8.0](https://github.com/appium/appium-xcuitest-driver/compare/v11.7.7...v11.8.0) (2026-06-02)
+
+### Features
+
+* **app:** use zip_conduit service for IPA installation/upgrade ([#2860](https://github.com/appium/appium-xcuitest-driver/issues/2860)) ([308ccfd](https://github.com/appium/appium-xcuitest-driver/commit/308ccfd1851a7bad1e0ae709aef617b32e07c922))
+
+## [11.7.7](https://github.com/appium/appium-xcuitest-driver/compare/v11.7.6...v11.7.7) (2026-06-01)
+
+### Miscellaneous Chores
+
+* Tune AFC performance logging ([#2858](https://github.com/appium/appium-xcuitest-driver/issues/2858)) ([03a9145](https://github.com/appium/appium-xcuitest-driver/commit/03a91454a8db7571e401bd9dc6d42aae4552133a))
+
+## [11.7.6](https://github.com/appium/appium-xcuitest-driver/compare/v11.7.5...v11.7.6) (2026-05-31)
+
+### Miscellaneous Chores
+
+* Add performance logging to real device app install ([#2857](https://github.com/appium/appium-xcuitest-driver/issues/2857)) ([3b460e6](https://github.com/appium/appium-xcuitest-driver/commit/3b460e68ba775c09abddbadf51abc61938730c8f))
+
+## [11.7.5](https://github.com/appium/appium-xcuitest-driver/compare/v11.7.4...v11.7.5) (2026-05-31)
+
+### Miscellaneous Chores
+
+* Bump appium-ios-remotexpc version ([5183a86](https://github.com/appium/appium-xcuitest-driver/commit/5183a8625a70517b5a04e0773a3ad4fa3d25539a))
+
+## [11.7.4](https://github.com/appium/appium-xcuitest-driver/compare/v11.7.3...v11.7.4) (2026-05-28)
+
+### Miscellaneous Chores
+
+* Tune error handling related to tunnels availability ([#2855](https://github.com/appium/appium-xcuitest-driver/issues/2855)) ([3670647](https://github.com/appium/appium-xcuitest-driver/commit/367064740da5812f3926dedcb9ebad4fd91d5629))
+
+## [11.7.3](https://github.com/appium/appium-xcuitest-driver/compare/v11.7.2...v11.7.3) (2026-05-26)
+
+### Miscellaneous Chores
+
+* Document new WDA XPath lookup features ([#2852](https://github.com/appium/appium-xcuitest-driver/issues/2852)) ([78c3578](https://github.com/appium/appium-xcuitest-driver/commit/78c3578679cb53316429e16eb207afcb1079f2de))
+
+## [11.7.2](https://github.com/appium/appium-xcuitest-driver/compare/v11.7.1...v11.7.2) (2026-05-26)
+
+### Miscellaneous Chores
+
+* Bump appium-ios-remotexpc to ^2.2.0 ([#2851](https://github.com/appium/appium-xcuitest-driver/issues/2851)) ([d2d3ec6](https://github.com/appium/appium-xcuitest-driver/commit/d2d3ec661ac748df3a18e6da8317a433ef213923))
+
+## [11.7.1](https://github.com/appium/appium-xcuitest-driver/compare/v11.7.0...v11.7.1) (2026-05-24)
+
+### Bug Fixes
+
+* Tune WDA cleanup ([#2849](https://github.com/appium/appium-xcuitest-driver/issues/2849)) ([417f7d4](https://github.com/appium/appium-xcuitest-driver/commit/417f7d473234e629e9e2886f730e945dbf8165fd))
+
+## [11.7.0](https://github.com/appium/appium-xcuitest-driver/compare/v11.6.1...v11.7.0) (2026-05-23)
+
+### Features
+
+* Ditch lodash ([#2846](https://github.com/appium/appium-xcuitest-driver/issues/2846)) ([daa3eb0](https://github.com/appium/appium-xcuitest-driver/commit/daa3eb0936a6552c0163c6e16065ed400e3a021f))
+
+## [11.6.1](https://github.com/appium/appium-xcuitest-driver/compare/v11.6.0...v11.6.1) (2026-05-22)
+
+### Bug Fixes
+
+* Embed app icon into Runner.app error in WDA build ([#2848](https://github.com/appium/appium-xcuitest-driver/issues/2848)) ([c8ce387](https://github.com/appium/appium-xcuitest-driver/commit/c8ce387baa7858edf43e4f06c7cca8f16c07d95c))
+
+## [11.6.0](https://github.com/appium/appium-xcuitest-driver/compare/v11.5.1...v11.6.0) (2026-05-21)
+
+### Features
+
+* Incorporate RSD isolation after remotexpc bump ([#2841](https://github.com/appium/appium-xcuitest-driver/issues/2841)) ([d1abfa0](https://github.com/appium/appium-xcuitest-driver/commit/d1abfa08c7c3f056183cdaa669167f6d0644def6))
+
 ## [11.5.1](https://github.com/appium/appium-xcuitest-driver/compare/v11.5.0...v11.5.1) (2026-05-20)
 
 ### Bug Fixes
