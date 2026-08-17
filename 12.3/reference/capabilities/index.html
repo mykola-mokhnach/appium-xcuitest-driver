@@ -3860,12 +3860,12 @@ about capabilities, refer to the <a href="https://appium.io/docs/en/latest/guide
 </tr>
 <tr>
 <td><code>appium:nativeWebTap</code></td>
-<td>Enable native, non-javascript-based taps being in web context mode. Defaults to <code>false</code>. Warning: sometimes the preciseness of native taps could be broken, because there is no reliable way to map web element coordinates to native ones.</td>
+<td>Enable native, non-javascript-based taps being in web context mode. Defaults to <code>false</code>. Web-to-native coordinate translation is calibrated automatically: the driver fits an empirical offset/pixel-ratio transform against the current page and refits it whenever the orientation, viewport size, or scroll position changes. See <a href="../execute-methods/#mobile-calibratewebtorealcoordinatestranslation">mobile: calibrateWebToRealCoordinatesTranslation</a> for details.</td>
 <td><code>true</code></td>
 </tr>
 <tr>
 <td><code>appium:nativeWebTapStrict</code></td>
-<td>Enabling this capability would skip the additional logic that tries to match web view elements to native ones by using their textual descriptions. Depending on the actual web view content this algorithm might sometimes be not very reliable and will slow down each click as we anyway fallback to the usual coordinates transformation flow if it fails. It is advised to enable strict tap if you use <a href="../execute-methods/#mobile-calibratewebtorealcoordinatestranslation">mobile: calibrateWebToRealCoordinatesTranslation</a> extension. Only applicable if <code>nativeWebTap</code> is enabled. <code>false</code> by default</td>
+<td>Enabling this capability would skip the additional logic that tries to match web view elements to native ones. Depending on the actual web view content this algorithm might sometimes fail, which will slow down each click as we anyway fallback to the usual coordinates transformation flow if it fails. It is advised to enable strict tap if you use <a href="../execute-methods/#mobile-calibratewebtorealcoordinatestranslation">mobile: calibrateWebToRealCoordinatesTranslation</a> extension. Only applicable if <code>nativeWebTap</code> is enabled. <code>false</code> by default</td>
 <td><code>true</code></td>
 </tr>
 <tr>
@@ -4012,7 +4012,7 @@ about capabilities, refer to the <a href="https://appium.io/docs/en/latest/guide
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="July 9, 2026 10:00:52 UTC"><span class="timeago" datetime="2026-07-09T10:00:52+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="July 9, 2026 10:00:52 UTC">2026-07-09</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="August 17, 2026 08:56:22 UTC"><span class="timeago" datetime="2026-08-17T08:56:22+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="August 17, 2026 08:56:22 UTC">2026-08-17</span>
   </span>
 
     

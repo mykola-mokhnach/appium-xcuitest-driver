@@ -13821,17 +13821,19 @@ On iOS 17+ it is an alias to <a href="#mobile-resetsimulatedlocation">mobile: re
 <h4 id="returned-result_36">Returned Result<a class="headerlink" href="#returned-result_36" title="Permanent link">&para;</a></h4>
 <p>Either <code>true</code> or <code>false</code>, where <code>true</code> means disabling of the condition inducer has been successful</p>
 <h3 id="mobile-calibratewebtorealcoordinatestranslation">mobile: calibrateWebToRealCoordinatesTranslation<a class="headerlink" href="#mobile-calibratewebtorealcoordinatestranslation" title="Permanent link">&para;</a></h3>
-<p>Calibrates web to real coordinates translation.
-This API can only be called from Safari web context.
-It must load a custom page to the browser, and then restore
-the original one, so don't call it if you can potentially
-lose the current web app state.
-The outcome of this API is then used if <code>nativeWebTap</code> capability/setting is enabled.
-The returned value could also be used to manually transform web coordinates
-to real device ones in client scripts.</p>
-<p>It is advised to call this API at least once before changing the device orientation
-or device screen layout as the recetly received value is cached for the session lifetime
-and may become obsolete.</p>
+<p>Calibrates web to real coordinates translation. This API can only be called from a web context
+(Safari or a hybrid app's webview).</p>
+<p>The driver fits an empirical transform by injecting a temporary, click-capturing overlay into the
+current page, tapping it via WDA at two known points, and reading back where those taps landed in
+web coordinates. This happens automatically and transparently the first time a native web tap
+needs it, and again whenever the orientation, viewport size, or scroll position changes — so
+calling this API explicitly is optional. Because the overlay is injected into (and removed from)
+the current page in place, calling it does not navigate away from the page under test or lose web
+app state.</p>
+<p>Calling this API explicitly is useful to warm the cache ahead of a timing-sensitive interaction,
+or to force a fresh calibration without waiting for a state change to invalidate the cached one.
+The returned value could also be used to manually transform web coordinates to real device ones
+in client scripts.</p>
 <p>It is advised to enable <code>nativeWebTapStrict</code> capability/setting to speed up dynamic coordinates
 transformation if you use this extension.</p>
 <h4 id="returned-result_37">Returned Result<a class="headerlink" href="#returned-result_37" title="Permanent link">&para;</a></h4>
@@ -14606,7 +14608,7 @@ Does not work for real devices.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="August 4, 2026 16:51:59 UTC"><span class="timeago" datetime="2026-08-04T16:51:59+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="August 4, 2026 16:51:59 UTC">2026-08-04</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="August 17, 2026 08:56:22 UTC"><span class="timeago" datetime="2026-08-17T08:56:22+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="August 17, 2026 08:56:22 UTC">2026-08-17</span>
   </span>
 
     
