@@ -2293,6 +2293,41 @@
 
 <!-- Table of contents item -->
 <li class="md-nav__item">
+  <a href="#using-a-native-webkit-automation-session" class="md-nav__link">
+    <span class="md-ellipsis"> Using a native WebKit automation session </span>
+  </a>
+
+  <!-- Table of contents list -->
+  
+</li>
+      
+        <!--
+  Copyright (c) 2016-2024 Martin Donath <martin.donath@squidfunk.com>
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to
+  deal in the Software without restriction, including without limitation the
+  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+  sell copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+  IN THE SOFTWARE.
+-->
+
+<!-- modified from https://raw.githubusercontent.com/squidfunk/mkdocs-material/master/src/templates/partials/toc-item.html
+     for the purpose of not showing all heading objects in the TOC -->
+
+<!-- Table of contents item -->
+<li class="md-nav__item">
   <a href="#examples" class="md-nav__link">
     <span class="md-ellipsis"> Examples </span>
   </a>
@@ -3100,6 +3135,41 @@
 
 <!-- Table of contents item -->
 <li class="md-nav__item">
+  <a href="#using-a-native-webkit-automation-session" class="md-nav__link">
+    <span class="md-ellipsis"> Using a native WebKit automation session </span>
+  </a>
+
+  <!-- Table of contents list -->
+  
+</li>
+      
+        <!--
+  Copyright (c) 2016-2024 Martin Donath <martin.donath@squidfunk.com>
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to
+  deal in the Software without restriction, including without limitation the
+  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+  sell copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+  IN THE SOFTWARE.
+-->
+
+<!-- modified from https://raw.githubusercontent.com/squidfunk/mkdocs-material/master/src/templates/partials/toc-item.html
+     for the purpose of not showing all heading objects in the TOC -->
+
+<!-- Table of contents item -->
+<li class="md-nav__item">
   <a href="#examples" class="md-nav__link">
     <span class="md-ellipsis"> Examples </span>
   </a>
@@ -3266,6 +3336,30 @@ to driver maintainers.</p>
 native application before entering it, you can have XCUITest driver automatically enter
 the web view context on session initialization by setting the <code>autoWebview</code>
 <a href="../../reference/capabilities/">capability</a> to <code>true</code>.</p>
+<h3 id="using-a-native-webkit-automation-session">Using a native WebKit automation session<a class="headerlink" href="#using-a-native-webkit-automation-session" title="Permanent link">&para;</a></h3>
+<p>By default, once in a web view context, commands are executed against the DOM by injecting
+Selenium atom scripts through the remote debugger connection described above. As an alternative,
+you can opt a session into driving the web view through WebKit's own <code>Automation</code> protocol instead,
+by invoking the <a href="../../reference/execute-methods/#mobile-startautomationsession">mobile: startAutomationSession</a>
+extension once you're in a web context. Simulator only for now - see
+<a href="../../reference/execute-methods/#mobile-startautomationsession">mobile: startAutomationSession</a>
+for why. From that point on, navigation, element find/interact,
+cookies, window/frame management, script execution, screenshots, W3C Actions, and JS-dialog
+handling are all routed through that automation session, until you call
+<a href="../../reference/execute-methods/#mobile-stopautomationsession">mobile: stopAutomationSession</a> (or
+the session/app disconnects). This is the only way to perform real W3C Actions against a web
+element, or to resize/maximize/minimize the browser window - atoms never supported either.</p>
+<p><strong>W3C Actions are currently unreliable through this session</strong>: a <code>performInteractionSequence</code>
+call has been observed to wedge the WebKit connection, leaving the next command unanswered. See
+<a href="https://bugs.webkit.org/show_bug.cgi?id=322937">WebKit bug 322937</a>; avoid W3C Actions here until
+it's fixed upstream.</p>
+<p>Switching context does not implicitly stop the session, so leaving the web view for
+<code>'NATIVE_APP'</code> and coming back resumes driving through it automatically.</p>
+<p>Stopping the session switches back to whichever web view was active before it started, if it
+still exists - see
+<a href="../../reference/execute-methods/#mobile-stopautomationsession">mobile: stopAutomationSession</a> for
+details. For background on this private WebKit <code>Automation</code> protocol in general, see
+<a href="https://webkit.org/blog/9395/webdriver-is-coming-to-safari-in-ios-13">WebDriver is coming to Safari in iOS 13</a>.</p>
 <h3 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h3>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Java</label><label for="__tabbed_1_2">Ruby</label><label for="__tabbed_1_3">Python</label></div>
 <div class="tabbed-content">
@@ -3359,7 +3453,7 @@ the web view context on session initialization by setting the <code>autoWebview<
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="April 22, 2026 17:28:57 UTC"><span class="timeago" datetime="2026-04-22T17:28:57+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="April 22, 2026 17:28:57 UTC">2026-04-22</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 2, 2026 14:09:30 UTC"><span class="timeago" datetime="2026-09-02T14:09:30+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 2, 2026 14:09:30 UTC">2026-09-02</span>
   </span>
 
     
