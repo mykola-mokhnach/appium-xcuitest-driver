@@ -7,7 +7,8 @@ import {node} from 'appium/support.js';
 import {createSandbox} from 'sinon';
 import type sinon from 'sinon';
 
-import type {XCUITestDriver} from '../../lib/driver.js';
+import {stop as stopWda} from '../../lib/commands/wda/stop.js';
+import {XCUITestDriver} from '../../lib/driver.js';
 import {
   resetDriverInstanceIpcForTesting,
   SessionClaimHandler,
@@ -94,7 +95,8 @@ describe('SessionClaimHandler', function () {
         debug: sandbox.stub(),
         warn: sandbox.stub(),
       },
-      startUnexpectedShutdown: sandbox.stub().resolves(),
+      eventEmitter: new EventEmitter(),
+      deleteSession: sandbox.stub().resolves(),
       ...overrides,
     } as unknown as XCUITestDriver;
   }
@@ -104,7 +106,7 @@ describe('SessionClaimHandler', function () {
       sessionId: 'old-session',
       opts: {udid: 'device-1'} as any,
     });
-    oldDriver.startUnexpectedShutdown = sandbox.stub().callsFake(async () => {
+    oldDriver.deleteSession = sandbox.stub().callsFake(async () => {
       sessionClaimHandler.unregisterActiveSession(oldDriver);
     });
     await sessionClaimHandler.registerActiveSession(oldDriver);
@@ -114,9 +116,9 @@ describe('SessionClaimHandler', function () {
     await sessionClaimHandler.registerActiveSession(newDriver);
     await sessionClaimHandler.claimSessionUdid(newDriver);
 
-    assert.strictEqual((oldDriver.startUnexpectedShutdown as sinon.SinonStub).calledOnce, true);
+    assert.strictEqual((oldDriver.deleteSession as sinon.SinonStub).calledOnce, true);
     assert.strictEqual((oldDriver.log.warn as sinon.SinonStub).calledWithMatch(/highly discouraged/), true);
-    assert.strictEqual((newDriver.startUnexpectedShutdown as sinon.SinonStub).called, false);
+    assert.strictEqual((newDriver.deleteSession as sinon.SinonStub).called, false);
     assert.deepStrictEqual(mockIpc.getMessage(SessionClaimHandler.RELEASED_TOPIC)?.data, {
       udid: 'device-1',
       sessionId: 'old-session',
@@ -132,7 +134,7 @@ describe('SessionClaimHandler', function () {
       sessionId: 'old-session',
       opts: {udid: 'DEVICE-1'} as any,
     });
-    oldDriver.startUnexpectedShutdown = sandbox.stub().callsFake(async () => {
+    oldDriver.deleteSession = sandbox.stub().callsFake(async () => {
       sessionClaimHandler.unregisterActiveSession(oldDriver);
     });
     await sessionClaimHandler.registerActiveSession(oldDriver);
@@ -142,7 +144,7 @@ describe('SessionClaimHandler', function () {
     await sessionClaimHandler.registerActiveSession(newDriver);
     await sessionClaimHandler.claimSessionUdid(newDriver);
 
-    assert.strictEqual((oldDriver.startUnexpectedShutdown as sinon.SinonStub).calledOnce, true);
+    assert.strictEqual((oldDriver.deleteSession as sinon.SinonStub).calledOnce, true);
   });
 
   it('should not wait for release confirmation when no session contends for the udid', async function () {
@@ -162,7 +164,7 @@ describe('SessionClaimHandler', function () {
           sessionId,
           opts: {udid: 'device-1'} as any,
         });
-        oldDriver.startUnexpectedShutdown = sandbox.stub().callsFake(async () => {
+        oldDriver.deleteSession = sandbox.stub().callsFake(async () => {
           sessionClaimHandler.unregisterActiveSession(oldDriver);
         });
         await sessionClaimHandler.registerActiveSession(oldDriver);
@@ -175,7 +177,7 @@ describe('SessionClaimHandler', function () {
     await sessionClaimHandler.claimSessionUdid(newDriver);
 
     for (const oldDriver of oldDrivers) {
-      assert.strictEqual((oldDriver.startUnexpectedShutdown as sinon.SinonStub).calledOnce, true);
+      assert.strictEqual((oldDriver.deleteSession as sinon.SinonStub).calledOnce, true);
     }
     assert.strictEqual(
       (newDriver.log.debug as sinon.SinonStub).calledWithMatch(
@@ -192,8 +194,8 @@ describe('SessionClaimHandler', function () {
       sessionId: 'old-session',
       opts: {udid: 'device-1'} as any,
     });
-    oldDriver.startUnexpectedShutdown = sandbox.stub().callsFake(async () => {
-      callOrder.push('startUnexpectedShutdown');
+    oldDriver.deleteSession = sandbox.stub().callsFake(async () => {
+      callOrder.push('deleteSession');
       sessionClaimHandler.unregisterActiveSession(oldDriver);
     });
     await sessionClaimHandler.registerActiveSession(oldDriver);
@@ -206,7 +208,7 @@ describe('SessionClaimHandler', function () {
       .getCalls()
       .findIndex((call) => call.args[0] === SessionClaimHandler.CONTENDED_TOPIC);
     assert.ok(contendedCallIndex > -1);
-    assert.deepStrictEqual(callOrder, ['startUnexpectedShutdown']);
+    assert.deepStrictEqual(callOrder, ['deleteSession']);
     assert.ok(
       contendedCallIndex < publish.getCalls().findIndex((call) => call.args[0] === SessionClaimHandler.RELEASED_TOPIC),
     );
@@ -230,12 +232,49 @@ describe('SessionClaimHandler', function () {
     ]);
   });
 
+  it('should notify the server and still send the WDA session DELETE before confirming the release', async function () {
+    const events: string[] = [];
+    const oldDriver = new XCUITestDriver({} as any);
+    oldDriver.sessionId = 'old-session';
+    (oldDriver.opts as any).udid = 'device-1';
+    oldDriver._wda = {
+      fullyStarted: true,
+      jwproxy: {
+        command: async (url: string, method: string) => {
+          events.push(`wda:${method} ${url}`);
+        },
+      },
+      canSkipXcodebuild: false,
+      webDriverAgentUrl: 'http://localhost:8100',
+    } as any;
+    oldDriver.onUnexpectedShutdown(() => events.push('server-notified'));
+    // the real proxyCommand() and stop() implementations, as used by deleteSession()
+    oldDriver.deleteSession = async () => {
+      await stopWda.call(oldDriver);
+      sessionClaimHandler.unregisterActiveSession(oldDriver);
+    };
+    const publish = mockIpc.publish.bind(mockIpc);
+    sandbox.stub(mockIpc, 'publish').callsFake(async (topic: string, publisher: string, data: any) => {
+      if (topic === SessionClaimHandler.RELEASED_TOPIC) {
+        events.push('released');
+      }
+      await publish(topic, publisher, data);
+    });
+    await sessionClaimHandler.registerActiveSession(oldDriver);
+
+    const newDriver = makeDriver();
+    await sessionClaimHandler.registerActiveSession(newDriver);
+    await sessionClaimHandler.claimSessionUdid(newDriver);
+
+    assert.deepStrictEqual(events, ['server-notified', 'wda:DELETE /session/old-session', 'released']);
+  });
+
   it('should ignore udid publications from the same session', async function () {
     const driver = makeDriver({sessionId: 'session-1'});
     await sessionClaimHandler.registerActiveSession(driver);
     await sessionClaimHandler.claimSessionUdid(driver);
 
-    assert.strictEqual((driver.startUnexpectedShutdown as sinon.SinonStub).called, false);
+    assert.strictEqual((driver.deleteSession as sinon.SinonStub).called, false);
   });
 
   it('should unregister IPC subscriptions on session cleanup', async function () {

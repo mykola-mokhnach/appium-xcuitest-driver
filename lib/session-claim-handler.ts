@@ -16,6 +16,9 @@ export type SessionUdidIpcMessage = {
 type AppiumIpcConstructor = new () => IAppiumIpc;
 type IpcProvider = () => Promise<IAppiumIpc | undefined>;
 
+// Name of BaseDriver's event, which makes the server drop the session and notify plugins
+const UNEXPECTED_SHUTDOWN_EVENT = 'onUnexpectedShutdown';
+
 export class SessionClaimHandler {
   static readonly CLAIMED_TOPIC = 'xcuitest:sessionUdidClaimed';
   static readonly CONTENDED_TOPIC = 'xcuitest:sessionUdidContended';
@@ -201,12 +204,15 @@ export class SessionClaimHandler {
     const {log} = driver;
 
     try {
-      // Unlike deleteSession(), this also makes the server drop the session from its list
-      await driver.startUnexpectedShutdown(
+      // startUnexpectedShutdown() would also turn proxyCommand() into a no-op and so skip the DELETE
+      // on a retained WDA. Only notify the server (it drops the session), then tear down normally.
+      driver.eventEmitter.emit(
+        UNEXPECTED_SHUTDOWN_EVENT,
         new errors.NoSuchDriverError(
           `This session has been replaced by a newer one on the same device (udid '${udid}')`,
         ),
       );
+      await driver.deleteSession();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       log.warn(`Could not terminate session '${sessionId}' on IPC request: ${msg}`);
